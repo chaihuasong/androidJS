@@ -225,10 +225,10 @@ function getDailyVerse_internal() {
     // Update widget text fields (may silently fail if no widget exists)
     try {
         __bridge.invoke('widget', 'updateText', JSON.stringify({
-            text_arabic: verse.arabic,
-            text_translation: verse.translation,
-            text_reference: verse.reference,
-            text_date: verse.date
+            text_line_1: verse.arabic,
+            text_line_2: verse.translation,
+            text_line_3: verse.reference,
+            text_line_4: verse.date
         }));
     } catch(e) {
         // Widget module may not be registered — ignore

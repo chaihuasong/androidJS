@@ -26,7 +26,7 @@ class WidgetUpdateWorker(
             val widgetModule = WidgetModule(
                 applicationContext,
                 ScriptWidgetProvider::class.java,
-                R.layout.widget_quran
+                R.layout.widget_script
             )
 
             val engine = AndroidJSEngine.Builder(applicationContext)

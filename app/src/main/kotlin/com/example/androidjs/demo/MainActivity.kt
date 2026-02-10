@@ -65,7 +65,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 engine = AndroidJSEngine.Builder(applicationContext)
-                    .addModule(WidgetModule(applicationContext, ScriptWidgetProvider::class.java, R.layout.widget_quran))
+                    .addModule(WidgetModule(applicationContext, ScriptWidgetProvider::class.java, R.layout.widget_script))
                     .setMemoryLimit(16 * 1024 * 1024)
                     .setExecutionTimeout(5000)
                     .build()
