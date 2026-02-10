@@ -2,18 +2,21 @@ package com.example.androidjs.demo
 
 import android.content.Intent
 import android.os.Bundle
-import android.view.View
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.androidjs.R
 import com.example.androidjs.accounting.AccountingPlugin
 import com.example.androidjs.accounting.ui.AccountingActivity
 import com.example.androidjs.core.AndroidJSEngine
+import com.example.androidjs.core.script.ScriptInfo
+import com.example.androidjs.core.script.ScriptManager
 import com.example.androidjs.widget.WidgetPlugin
-import com.google.android.material.button.MaterialButton
-import com.google.android.material.card.MaterialCardView
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -21,18 +24,40 @@ import kotlinx.serialization.json.Json
 class MainActivity : AppCompatActivity() {
 
     private lateinit var engine: AndroidJSEngine
+    private lateinit var scriptManager: ScriptManager
     private lateinit var textEngineStatus: TextView
+    private lateinit var swipeRefresh: SwipeRefreshLayout
+    private lateinit var recyclerScripts: RecyclerView
+    private lateinit var adapter: ScriptCardAdapter
+
     private val json = Json { ignoreUnknownKeys = true }
+    private var scriptItems = mutableListOf<ScriptItem>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
         textEngineStatus = findViewById(R.id.text_engine_status)
+        swipeRefresh = findViewById(R.id.swipe_refresh)
+        recyclerScripts = findViewById(R.id.recycler_scripts)
 
-        setupWidgetDemo()
-        setupAccountingDemo()
+        scriptManager = ScriptManager(applicationContext)
+
+        setupRecyclerView()
+        setupSwipeRefresh()
         initEngine()
+    }
+
+    private fun setupRecyclerView() {
+        adapter = ScriptCardAdapter { item -> onActionClick(item) }
+        recyclerScripts.layoutManager = LinearLayoutManager(this)
+        recyclerScripts.adapter = adapter
+    }
+
+    private fun setupSwipeRefresh() {
+        swipeRefresh.setOnRefreshListener {
+            loadManifest()
+        }
     }
 
     private fun initEngine() {
@@ -52,58 +77,136 @@ class MainActivity : AppCompatActivity() {
 
                 engine.initialize()
                 textEngineStatus.text = "AndroidJS Engine 已就绪 ✓"
+
+                loadManifest()
             } catch (e: Exception) {
                 textEngineStatus.text = "引擎初始化失败: ${e.message}"
             }
         }
     }
 
-    private fun setupWidgetDemo() {
-        val btnTest = findViewById<MaterialButton>(R.id.btn_test_widget)
-        val cardResult = findViewById<MaterialCardView>(R.id.card_widget_result)
-        val textResult = findViewById<TextView>(R.id.text_widget_result)
-
-        btnTest.setOnClickListener {
-            lifecycleScope.launch {
-                try {
-                    if (!::engine.isInitialized || !engine.isReady()) {
-                        Toast.makeText(this@MainActivity, "引擎尚未就绪", Toast.LENGTH_SHORT).show()
-                        return@launch
-                    }
-
-                    val result = engine.executeAssetScript("js/quran_widget.js")
-                    if (result != null) {
-                        val cleanResult = result.trim().let {
-                            if (it.startsWith("\"") && it.endsWith("\"")) {
-                                it.substring(1, it.length - 1)
-                                    .replace("\\\"", "\"")
-                                    .replace("\\\\", "\\")
-                            } else it
-                        }
-
-                        val verse = json.decodeFromString<QuranVerse>(cleanResult)
-                        textResult.text = buildString {
-                            appendLine("📖 ${verse.arabic}")
-                            appendLine()
-                            appendLine("🌍 ${verse.translation}")
-                            appendLine()
-                            append("📌 ${verse.reference} | ${verse.date}")
-                        }
-                        cardResult.visibility = View.VISIBLE
-                    }
+    private fun loadManifest() {
+        lifecycleScope.launch {
+            try {
+                val manifest = try {
+                    scriptManager.fetchManifest("mock://manifest")
                 } catch (e: Exception) {
-                    textResult.text = "执行失败: ${e.message}"
-                    cardResult.visibility = View.VISIBLE
+                    // Offline fallback: read from assets directly
+                    val fallback = assets.open("mock/manifest.json").bufferedReader().use { it.readText() }
+                    json.decodeFromString(fallback)
                 }
+
+                scriptItems = manifest.scripts.map { info ->
+                    val cached = scriptManager.getCachedScript(info.id)
+                    ScriptItem(info = info, cached = cached)
+                }.toMutableList()
+
+                adapter.submitList(scriptItems.toList())
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "加载脚本清单失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            } finally {
+                swipeRefresh.isRefreshing = false
             }
         }
     }
 
-    private fun setupAccountingDemo() {
-        val btnOpen = findViewById<MaterialButton>(R.id.btn_open_accounting)
-        btnOpen.setOnClickListener {
-            val intent = Intent(this, AccountingActivity::class.java)
-            startActivity(intent)
+    private fun onActionClick(item: ScriptItem) {
+        if (!::engine.isInitialized || !engine.isReady()) {
+            Toast.makeText(this, "引擎尚未就绪", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        if (!item.isCached || item.hasUpdate) {
+            downloadScript(item)
+        } else {
+            runScript(item.info, item.cached!!.localPath)
+        }
+    }
+
+    private fun downloadScript(item: ScriptItem) {
+        // Show loading state
+        updateItemLoading(item.info.id, true)
+
+        lifecycleScope.launch {
+            try {
+                scriptManager.downloadScript(item.info)
+
+                // Refresh item with new cache state
+                val cached = scriptManager.getCachedScript(item.info.id)
+                updateItem(item.info.id) { it.copy(cached = cached, isLoading = false) }
+
+                Toast.makeText(this@MainActivity, "${item.info.name} 下载完成", Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                updateItemLoading(item.info.id, false)
+                Toast.makeText(this@MainActivity, "下载失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun runScript(info: ScriptInfo, path: String) {
+        lifecycleScope.launch {
+            try {
+                when (info.id) {
+                    "quran_widget" -> {
+                        val result = engine.executeFileScript(path)
+                        if (result != null) {
+                            showQuranResult(result)
+                        }
+                    }
+                    "accounting" -> {
+                        val intent = Intent(this@MainActivity, AccountingActivity::class.java)
+                        intent.putExtra("script_path", path)
+                        startActivity(intent)
+                    }
+                    else -> {
+                        val result = engine.executeFileScript(path)
+                        Toast.makeText(this@MainActivity, "结果: $result", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "执行失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun showQuranResult(result: String) {
+        val cleanResult = result.trim().let {
+            if (it.startsWith("\"") && it.endsWith("\"")) {
+                it.substring(1, it.length - 1)
+                    .replace("\\\"", "\"")
+                    .replace("\\\\", "\\")
+            } else it
+        }
+
+        try {
+            val verse = json.decodeFromString<QuranVerse>(cleanResult)
+            val message = buildString {
+                appendLine("${verse.arabic}")
+                appendLine()
+                appendLine("${verse.translation}")
+                appendLine()
+                append("${verse.reference} | ${verse.date}")
+            }
+
+            AlertDialog.Builder(this)
+                .setTitle("今日经文")
+                .setMessage(message)
+                .setPositiveButton("确定", null)
+                .show()
+        } catch (e: Exception) {
+            Toast.makeText(this, "解析结果失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun updateItemLoading(scriptId: String, loading: Boolean) {
+        updateItem(scriptId) { it.copy(isLoading = loading) }
+    }
+
+    private fun updateItem(scriptId: String, transform: (ScriptItem) -> ScriptItem) {
+        val index = scriptItems.indexOfFirst { it.info.id == scriptId }
+        if (index >= 0) {
+            scriptItems[index] = transform(scriptItems[index])
+            adapter.submitList(scriptItems.toList())
         }
     }
 

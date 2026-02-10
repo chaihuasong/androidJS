@@ -92,8 +92,13 @@ class AccountingActivity : AppCompatActivity() {
                     .build()
                 engine.initialize()
 
-                // Load the accounting JS module
-                engine.executeAssetScript("js/accounting.js")
+                // Load the accounting JS module — prefer cached script if available
+                val scriptPath = intent.getStringExtra("script_path")
+                if (scriptPath != null) {
+                    engine.executeFileScript(scriptPath)
+                } else {
+                    engine.executeAssetScript("js/accounting.js")
+                }
             } catch (e: Exception) {
                 Toast.makeText(this@AccountingActivity, "引擎初始化失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }

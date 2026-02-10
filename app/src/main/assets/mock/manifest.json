@@ -1,0 +1,25 @@
+{
+  "manifestVersion": 1,
+  "scripts": [
+    {
+      "id": "quran_widget",
+      "name": "古兰经桌面组件",
+      "description": "每日更新一句经文，添加到桌面小组件",
+      "version": 1,
+      "url": "mock://quran_widget",
+      "requiredModules": ["widget"],
+      "icon": "📖",
+      "color": "#1B5E20"
+    },
+    {
+      "id": "accounting",
+      "name": "智能记账",
+      "description": "语音/文字输入，自动分类和存储账单",
+      "version": 1,
+      "url": "mock://accounting",
+      "requiredModules": ["voice", "accountingStorage"],
+      "icon": "💰",
+      "color": "#283593"
+    }
+  ]
+}

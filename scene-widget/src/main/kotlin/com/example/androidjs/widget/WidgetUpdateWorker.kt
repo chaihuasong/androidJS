@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.androidjs.core.AndroidJSEngine
+import com.example.androidjs.core.script.ScriptManager
 import kotlinx.serialization.json.Json
 
 /**
@@ -32,7 +33,13 @@ class WidgetUpdateWorker(
 
             engine.initialize()
 
-            val result = engine.executeAssetScript("js/quran_widget.js")
+            val scriptManager = ScriptManager(applicationContext)
+            val cachedPath = scriptManager.getCachedScriptPath("quran_widget")
+            val result = if (cachedPath != null) {
+                engine.executeFileScript(cachedPath)
+            } else {
+                engine.executeAssetScript("js/quran_widget.js")
+            }
             Log.d(TAG, "JS result: $result")
 
             if (result != null) {

@@ -48,5 +48,7 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.material)
     implementation(libs.constraintlayout)
+    implementation(libs.recyclerview)
+    implementation(libs.swiperefreshlayout)
     implementation(libs.lifecycle.runtime.ktx)
 }
