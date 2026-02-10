@@ -4,15 +4,14 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.util.Log
-import android.widget.RemoteViews
 import androidx.work.*
 import java.util.concurrent.TimeUnit
 
 /**
- * AppWidgetProvider for the Quran daily verse widget.
+ * Generic AppWidgetProvider for script-driven widgets.
  * Manages widget lifecycle and schedules periodic updates via WorkManager.
  */
-class QuranWidgetProvider : AppWidgetProvider() {
+class ScriptWidgetProvider : AppWidgetProvider() {
 
     override fun onUpdate(
         context: Context,
@@ -62,7 +61,7 @@ class QuranWidgetProvider : AppWidgetProvider() {
     }
 
     companion object {
-        private const val TAG = "QuranWidgetProvider"
-        private const val WORK_NAME = "quran_widget_daily_update"
+        private const val TAG = "ScriptWidgetProvider"
+        private const val WORK_NAME = "script_widget_periodic_update"
     }
 }

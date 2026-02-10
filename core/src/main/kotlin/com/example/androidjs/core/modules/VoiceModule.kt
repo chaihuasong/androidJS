@@ -1,4 +1,4 @@
-package com.example.androidjs.accounting
+package com.example.androidjs.core.modules
 
 import android.content.Context
 import android.content.Intent
@@ -12,9 +12,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 
 /**
- * Native module bridging Android SpeechRecognizer to JS.
+ * Generic voice recognition module.
+ * Locale is passed from JS via startListening({locale}).
  */
-class VoiceNativeModule(private val context: Context) : NativeModule {
+class VoiceModule(private val context: Context) : NativeModule {
 
     override val name: String = "voice"
 
@@ -42,7 +43,12 @@ class VoiceNativeModule(private val context: Context) : NativeModule {
     override fun invokeAsync(method: String, argsJson: String, callback: (String) -> Unit) {
         when (method) {
             "startListening" -> {
-                startListening(callback)
+                val args = try {
+                    json.decodeFromString<ListenArgs>(argsJson)
+                } catch (e: Exception) {
+                    ListenArgs()
+                }
+                startListening(args.locale, callback)
             }
             else -> {
                 callback(json.encodeToString(
@@ -53,7 +59,7 @@ class VoiceNativeModule(private val context: Context) : NativeModule {
         }
     }
 
-    private fun startListening(callback: (String) -> Unit) {
+    private fun startListening(locale: String, callback: (String) -> Unit) {
         if (!SpeechRecognizer.isRecognitionAvailable(context)) {
             callback(json.encodeToString(
                 VoiceResult.serializer(),
@@ -110,7 +116,7 @@ class VoiceNativeModule(private val context: Context) : NativeModule {
 
             val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, "zh-CN")
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, locale)
                 putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             }
 
@@ -130,11 +136,14 @@ class VoiceNativeModule(private val context: Context) : NativeModule {
         isListening = false
     }
 
-    fun destroy() {
+    override fun destroy() {
         speechRecognizer?.destroy()
         speechRecognizer = null
         isListening = false
     }
+
+    @Serializable
+    data class ListenArgs(val locale: String = "en-US")
 
     @Serializable
     data class VoiceResult(
@@ -147,6 +156,6 @@ class VoiceNativeModule(private val context: Context) : NativeModule {
     data class VoiceAvailableResult(val available: Boolean)
 
     companion object {
-        private const val TAG = "VoiceNativeModule"
+        private const val TAG = "VoiceModule"
     }
 }

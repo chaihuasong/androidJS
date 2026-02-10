@@ -51,4 +51,6 @@ dependencies {
     implementation(libs.recyclerview)
     implementation(libs.swiperefreshlayout)
     implementation(libs.lifecycle.runtime.ktx)
+    implementation(libs.lifecycle.viewmodel.ktx)
+    implementation(libs.work.runtime.ktx)
 }

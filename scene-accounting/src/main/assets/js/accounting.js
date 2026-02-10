@@ -2,6 +2,7 @@
  * Smart Accounting JS Logic
  * Parses natural language input to extract transaction data.
  * Supports Chinese language input for amount, category, and type detection.
+ * Uses generic database and ui modules for storage and display.
  */
 
 // Category rules mapping keywords to categories
@@ -31,10 +32,127 @@ var categoryRules = {
     '其他': []
 };
 
+var categoryColors = {
+    '餐饮': '#FF7043', '交通': '#42A5F5', '购物': '#AB47BC',
+    '娱乐': '#FFA726', '住房': '#26A69A', '医疗': '#EF5350',
+    '教育': '#5C6BC0', '通讯': '#66BB6A', '人情': '#EC407A',
+    '其他': '#78909C'
+};
+
 // Income keywords
 var incomeKeywords = ['工资', '薪水', '奖金', '收入', '到账', '进账', '赚',
                       '报销', '退款', '利息', '分红', '兼职', '稿费',
                       '转入', '收到', '红包收入'];
+
+/**
+ * Called by ScriptActivity when the activity is created.
+ */
+function onActivityCreated() {
+    __bridge.invoke('ui', 'configure', JSON.stringify({
+        title: '智能记账',
+        inputHint: '输入记账内容，如：午饭花了30块',
+        submitText: '记账',
+        showVoice: true,
+        voiceLocale: 'zh-CN',
+        summaryLabels: ['总支出', '总收入'],
+        summaryColors: ['#F44336', '#4CAF50']
+    }));
+
+    // Create table if not exists
+    __bridge.invoke('database', 'exec', JSON.stringify({
+        sql: 'CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY AUTOINCREMENT, amount REAL, category TEXT, description TEXT, type TEXT, rawInput TEXT, timestamp INTEGER)'
+    }));
+
+    refreshList();
+}
+
+/**
+ * Called when the user submits text input.
+ */
+function onInput(text) {
+    var result = JSON.parse(parseTransaction(text));
+    if (result.success) {
+        __bridge.invoke('database', 'exec', JSON.stringify({
+            sql: 'INSERT INTO transactions (amount, category, description, type, rawInput, timestamp) VALUES (?, ?, ?, ?, ?, ?)',
+            params: [result.amount, result.category, result.description, result.type, result.rawInput, Date.now()]
+        }));
+
+        var typeText = result.type === 'expense' ? '支出' : '收入';
+        __bridge.invoke('ui', 'showResult', JSON.stringify({
+            text: '\u2713 ' + typeText + ' \u00a5' + result.amount.toFixed(2) + ' | 分类: ' + result.category + ' | ' + result.description,
+            success: true
+        }));
+        __bridge.invoke('ui', 'clearInput', '{}');
+        refreshList();
+    } else {
+        __bridge.invoke('ui', 'showResult', JSON.stringify({
+            text: '\u2717 解析失败: ' + result.error,
+            success: false
+        }));
+    }
+}
+
+/**
+ * Called when voice recognition returns text.
+ */
+function onVoiceResult(text) {
+    onInput(text);
+}
+
+/**
+ * Refresh the transaction list and summary from database.
+ */
+function refreshList() {
+    var queryResult = JSON.parse(__bridge.invoke('database', 'query', JSON.stringify({
+        sql: 'SELECT * FROM transactions ORDER BY timestamp DESC'
+    })));
+
+    // Parse bridge response — result may be wrapped in {success, data}
+    var data = queryResult;
+    if (queryResult.success !== undefined && queryResult.data) {
+        data = typeof queryResult.data === 'string' ? JSON.parse(queryResult.data) : queryResult.data;
+    }
+
+    var rows = data.rows || [];
+    var items = [];
+    var totalExpense = 0;
+    var totalIncome = 0;
+
+    for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        var amount = parseFloat(row.amount) || 0;
+        var type = row.type || 'expense';
+        var category = row.category || '其他';
+        var isExpense = type === 'expense';
+
+        if (isExpense) {
+            totalExpense += amount;
+        } else {
+            totalIncome += amount;
+        }
+
+        var prefix = isExpense ? '-\u00a5' : '+\u00a5';
+        var ts = parseInt(row.timestamp) || 0;
+        var d = new Date(ts);
+        var timeStr = (d.getMonth() + 1) + '/' + d.getDate() + ' ' +
+            ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2);
+
+        items.push({
+            tag: category,
+            tagColor: categoryColors[category] || '#78909C',
+            title: row.description || category,
+            subtitle: '\u300c' + (row.rawInput || '') + '\u300d',
+            value: prefix + amount.toFixed(2),
+            valueColor: isExpense ? '#F44336' : '#4CAF50',
+            time: timeStr
+        });
+    }
+
+    __bridge.invoke('ui', 'updateList', JSON.stringify({ items: items }));
+    __bridge.invoke('ui', 'updateSummary', JSON.stringify({
+        values: ['\u00a5' + totalExpense.toFixed(2), '\u00a5' + totalIncome.toFixed(2)]
+    }));
+}
 
 /**
  * Parse a natural language input string to extract transaction data.
@@ -214,10 +332,11 @@ function generateDescription(input, amount, category) {
     return desc;
 }
 
-// Export the parse function as the main entry point
-// The native side will call: parseTransaction(userInput)
-// This makes it available globally
+// Export functions globally
 this.parseTransaction = parseTransaction;
+this.onActivityCreated = onActivityCreated;
+this.onInput = onInput;
+this.onVoiceResult = onVoiceResult;
 
 // Return a confirmation that the script loaded
 JSON.stringify({ loaded: true, module: 'accounting' });

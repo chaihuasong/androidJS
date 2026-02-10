@@ -23,15 +23,14 @@
             </intent-filter>
         </activity>
 
-        <!-- Accounting Activity -->
+        <!-- Script Activity (generic, JS-driven) -->
         <activity
-            android:name="com.example.androidjs.accounting.ui.AccountingActivity"
-            android:exported="false"
-            android:label="智能记账" />
+            android:name=".demo.ScriptActivity"
+            android:exported="false" />
 
-        <!-- Quran Widget Provider -->
+        <!-- Script Widget Provider -->
         <receiver
-            android:name="com.example.androidjs.widget.QuranWidgetProvider"
+            android:name="com.example.androidjs.widget.ScriptWidgetProvider"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

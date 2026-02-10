@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AndroidJS Demo</string>
+    <string name="widget_description">Script-powered widget - updates content periodically via JS</string>
+    <string name="widget_name">Script Widget</string>
 </resources>

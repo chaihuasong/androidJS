@@ -11,7 +11,8 @@ data class ScriptInfo(
     val url: String,
     val requiredModules: List<String> = emptyList(),
     val icon: String = "",
-    val color: String = ""
+    val color: String = "",
+    val display: String = "dialog"
 )
 
 @Serializable

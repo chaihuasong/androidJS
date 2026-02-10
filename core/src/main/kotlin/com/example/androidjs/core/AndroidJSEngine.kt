@@ -8,9 +8,7 @@ import com.example.androidjs.core.engine.JSEngine
 import com.example.androidjs.core.modules.LogModule
 import com.example.androidjs.core.modules.NetworkModule
 import com.example.androidjs.core.modules.StorageModule
-import com.example.androidjs.core.plugin.AndroidJSPlugin
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.example.androidjs.core.bridge.NativeModule
 
 /**
  * Public API entry point for the AndroidJS SDK.
@@ -19,7 +17,7 @@ import kotlinx.coroutines.withContext
  * Example:
  * ```kotlin
  * val engine = AndroidJSEngine.Builder(context)
- *     .addPlugin(widgetPlugin)
+ *     .addModule(MyNativeModule())
  *     .setMemoryLimit(16 * 1024 * 1024)
  *     .setExecutionTimeout(5000)
  *     .build()
@@ -30,7 +28,7 @@ import kotlinx.coroutines.withContext
  */
 class AndroidJSEngine private constructor(
     private val appContext: Context,
-    private val plugins: List<AndroidJSPlugin>,
+    private val modules: List<NativeModule>,
     private val memoryLimit: Long,
     private val executionTimeout: Long,
     private val enableBuiltinModules: Boolean
@@ -51,13 +49,10 @@ class AndroidJSEngine private constructor(
             dispatcher.registerModule(NetworkModule())
         }
 
-        // Register plugin modules
-        for (plugin in plugins) {
-            for (module in plugin.getModules()) {
-                dispatcher.registerModule(module)
-            }
-            plugin.onRegistered()
-            Log.d(TAG, "Plugin registered: ${plugin.name}")
+        // Register additional modules
+        for (module in modules) {
+            dispatcher.registerModule(module)
+            Log.d(TAG, "Module registered: ${module.name}")
         }
 
         // Initialize the JS engine
@@ -102,21 +97,21 @@ class AndroidJSEngine private constructor(
      * Destroy the engine and release all resources.
      */
     fun destroy() {
-        for (plugin in plugins) {
-            plugin.onDestroy()
+        for (module in modules) {
+            module.destroy()
         }
         jsEngine.destroy()
         Log.d(TAG, "AndroidJSEngine destroyed")
     }
 
     class Builder(private val context: Context) {
-        private val plugins = mutableListOf<AndroidJSPlugin>()
+        private val modules = mutableListOf<NativeModule>()
         private var memoryLimit = JSContext.DEFAULT_MEMORY_LIMIT
         private var executionTimeout = JSContext.DEFAULT_EXECUTION_TIMEOUT
         private var enableBuiltinModules = true
 
-        fun addPlugin(plugin: AndroidJSPlugin) = apply {
-            plugins.add(plugin)
+        fun addModule(module: NativeModule) = apply {
+            modules.add(module)
         }
 
         fun setMemoryLimit(bytes: Long) = apply {
@@ -134,7 +129,7 @@ class AndroidJSEngine private constructor(
         fun build(): AndroidJSEngine {
             return AndroidJSEngine(
                 appContext = context.applicationContext,
-                plugins = plugins.toList(),
+                modules = modules.toList(),
                 memoryLimit = memoryLimit,
                 executionTimeout = executionTimeout,
                 enableBuiltinModules = enableBuiltinModules

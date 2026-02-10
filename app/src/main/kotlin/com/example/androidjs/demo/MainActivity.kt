@@ -11,12 +11,11 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.androidjs.R
-import com.example.androidjs.accounting.AccountingPlugin
-import com.example.androidjs.accounting.ui.AccountingActivity
 import com.example.androidjs.core.AndroidJSEngine
+import com.example.androidjs.core.modules.WidgetModule
 import com.example.androidjs.core.script.ScriptInfo
 import com.example.androidjs.core.script.ScriptManager
-import com.example.androidjs.widget.WidgetPlugin
+import com.example.androidjs.widget.ScriptWidgetProvider
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -65,12 +64,8 @@ class MainActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                val widgetPlugin = WidgetPlugin(applicationContext)
-                val accountingPlugin = AccountingPlugin(applicationContext)
-
                 engine = AndroidJSEngine.Builder(applicationContext)
-                    .addPlugin(widgetPlugin)
-                    .addPlugin(accountingPlugin)
+                    .addModule(WidgetModule(applicationContext, ScriptWidgetProvider::class.java, R.layout.widget_quran))
                     .setMemoryLimit(16 * 1024 * 1024)
                     .setExecutionTimeout(5000)
                     .build()
@@ -144,32 +139,31 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun runScript(info: ScriptInfo, path: String) {
-        lifecycleScope.launch {
-            try {
-                when (info.id) {
-                    "quran_widget" -> {
+        when (info.display) {
+            "activity" -> {
+                val intent = Intent(this, ScriptActivity::class.java)
+                intent.putExtra("script_path", path)
+                // Also pass asset fallback path based on script id
+                intent.putExtra("asset_path", "js/${info.id}.js")
+                startActivity(intent)
+            }
+            else -> {
+                // Default: execute script and show result in dialog
+                lifecycleScope.launch {
+                    try {
                         val result = engine.executeFileScript(path)
                         if (result != null) {
-                            showQuranResult(result)
+                            showDialogResult(result)
                         }
-                    }
-                    "accounting" -> {
-                        val intent = Intent(this@MainActivity, AccountingActivity::class.java)
-                        intent.putExtra("script_path", path)
-                        startActivity(intent)
-                    }
-                    else -> {
-                        val result = engine.executeFileScript(path)
-                        Toast.makeText(this@MainActivity, "结果: $result", Toast.LENGTH_LONG).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(this@MainActivity, "执行失败: ${e.message}", Toast.LENGTH_SHORT).show()
                     }
                 }
-            } catch (e: Exception) {
-                Toast.makeText(this@MainActivity, "执行失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
-    private fun showQuranResult(result: String) {
+    private fun showDialogResult(result: String) {
         val cleanResult = result.trim().let {
             if (it.startsWith("\"") && it.endsWith("\"")) {
                 it.substring(1, it.length - 1)
@@ -179,22 +173,22 @@ class MainActivity : AppCompatActivity() {
         }
 
         try {
-            val verse = json.decodeFromString<QuranVerse>(cleanResult)
-            val message = buildString {
-                appendLine("${verse.arabic}")
-                appendLine()
-                appendLine("${verse.translation}")
-                appendLine()
-                append("${verse.reference} | ${verse.date}")
-            }
-
+            val dialogData = json.decodeFromString<DialogResult>(cleanResult)
             AlertDialog.Builder(this)
-                .setTitle("今日经文")
-                .setMessage(message)
+                .setTitle(dialogData.title)
+                .setMessage(dialogData.message)
                 .setPositiveButton("确定", null)
                 .show()
         } catch (e: Exception) {
-            Toast.makeText(this, "解析结果失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            // Fallback: show raw result with escape sequences converted
+            val displayText = cleanResult
+                .replace("\\n", "\n")
+                .replace("\\t", "\t")
+            AlertDialog.Builder(this)
+                .setTitle("结果")
+                .setMessage(displayText)
+                .setPositiveButton("确定", null)
+                .show()
         }
     }
 
@@ -218,12 +212,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     @Serializable
-    private data class QuranVerse(
-        val arabic: String = "",
-        val translation: String = "",
-        val surah: String = "",
-        val ayah: String = "",
-        val reference: String = "",
-        val date: String = ""
+    private data class DialogResult(
+        val title: String = "",
+        val message: String = ""
     )
 }

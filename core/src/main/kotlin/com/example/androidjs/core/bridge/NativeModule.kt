@@ -17,4 +17,7 @@ interface NativeModule {
         val result = invoke(method, argsJson)
         callback(result ?: "{}")
     }
+
+    /** Called when the engine is being destroyed. Override to release resources. */
+    fun destroy() {}
 }

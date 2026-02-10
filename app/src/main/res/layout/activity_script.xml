@@ -10,7 +10,6 @@
         android:id="@+id/text_title"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="智能记账"
         android:textSize="24sp"
         android:textStyle="bold"
         android:textColor="#212121"
@@ -46,20 +45,19 @@
                 android:gravity="center">
 
                 <TextView
+                    android:id="@+id/text_summary_label_1"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="总支出"
                     android:textSize="12sp"
                     android:textColor="#757575" />
 
                 <TextView
-                    android:id="@+id/text_total_expense"
+                    android:id="@+id/text_summary_value_1"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="¥0.00"
                     android:textSize="20sp"
                     android:textStyle="bold"
-                    android:textColor="#F44336" />
+                    android:textColor="#424242" />
             </LinearLayout>
 
             <View
@@ -75,20 +73,19 @@
                 android:gravity="center">
 
                 <TextView
+                    android:id="@+id/text_summary_label_2"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="总收入"
                     android:textSize="12sp"
                     android:textColor="#757575" />
 
                 <TextView
-                    android:id="@+id/text_total_income"
+                    android:id="@+id/text_summary_value_2"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="¥0.00"
                     android:textSize="20sp"
                     android:textStyle="bold"
-                    android:textColor="#4CAF50" />
+                    android:textColor="#424242" />
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
@@ -118,7 +115,6 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:hint="输入记账内容，如：午饭花了30块"
                 android:textSize="14sp"
                 android:inputType="text"
                 android:background="@android:color/transparent"
@@ -132,20 +128,20 @@
                 android:layout_height="44dp"
                 android:src="@android:drawable/ic_btn_speak_now"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="语音输入"
+                android:contentDescription="@null"
+                android:visibility="gone"
                 android:layout_marginEnd="4dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btn_submit"
                 android:layout_width="wrap_content"
                 android:layout_height="40dp"
-                android:text="记账"
                 android:textSize="14sp"
                 app:cornerRadius="20dp" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Parse Result Card (shown after parsing) -->
+    <!-- Result Card -->
     <com.google.android.material.card.MaterialCardView
         android:id="@+id/card_result"
         android:layout_width="0dp"
@@ -169,12 +165,11 @@
             android:textColor="#2E7D32" />
     </com.google.android.material.card.MaterialCardView>
 
-    <!-- Transaction List Header -->
+    <!-- List Header -->
     <TextView
         android:id="@+id/text_list_header"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="交易记录"
         android:textSize="16sp"
         android:textStyle="bold"
         android:textColor="#424242"
@@ -185,9 +180,9 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <!-- Transaction RecyclerView -->
+    <!-- List RecyclerView -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/recycler_transactions"
+        android:id="@+id/recycler_list"
         android:layout_width="0dp"
         android:layout_height="0dp"
         android:paddingHorizontal="16dp"
@@ -202,7 +197,6 @@
         android:id="@+id/text_empty"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="暂无记录\n试试输入「午饭花了30块」"
         android:textSize="14sp"
         android:textColor="#9E9E9E"
         android:gravity="center"

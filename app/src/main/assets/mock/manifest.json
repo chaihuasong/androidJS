@@ -9,7 +9,8 @@
       "url": "mock://quran_widget",
       "requiredModules": ["widget"],
       "icon": "📖",
-      "color": "#1B5E20"
+      "color": "#1B5E20",
+      "display": "dialog"
     },
     {
       "id": "accounting",
@@ -17,9 +18,10 @@
       "description": "语音/文字输入，自动分类和存储账单",
       "version": 1,
       "url": "mock://accounting",
-      "requiredModules": ["voice", "accountingStorage"],
+      "requiredModules": ["voice", "database"],
       "icon": "💰",
-      "color": "#283593"
+      "color": "#283593",
+      "display": "activity"
     }
   ]
 }
