@@ -35,7 +35,8 @@
         <activity
             android:name=".chat.ChatActivity"
             android:exported="false"
-            android:label="Clawdbot" />
+            android:label="Clawdbot"
+            android:windowSoftInputMode="adjustResize" />
 
         <!-- Alarm Receiver -->
         <receiver
