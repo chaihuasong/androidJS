@@ -1,6 +1,5 @@
 package com.example.androidjs.demo
 
-import android.content.Intent
 import android.os.Bundle
 import android.widget.TextView
 import android.widget.Toast
@@ -63,6 +62,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 engine = AndroidJSEngine.Builder(applicationContext)
+                    .addModule(WindowModule(this@MainActivity))
                     .setMemoryLimit(16 * 1024 * 1024)
                     .setExecutionTimeout(5000)
                     .build()
@@ -136,26 +136,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun runScript(info: ScriptInfo, path: String) {
-        when (info.display) {
-            "activity" -> {
-                val intent = Intent(this, ScriptActivity::class.java)
-                intent.putExtra("script_path", path)
-                // Also pass asset fallback path based on script id
-                intent.putExtra("asset_path", "js/${info.id}.js")
-                startActivity(intent)
-            }
-            else -> {
-                // Default: execute script and show result in dialog
-                lifecycleScope.launch {
-                    try {
-                        val result = engine.executeFileScript(path)
-                        if (result != null) {
-                            showDialogResult(result)
-                        }
-                    } catch (e: Exception) {
-                        Toast.makeText(this@MainActivity, "执行失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
+        lifecycleScope.launch {
+            try {
+                val result = engine.executeFileScript(path)
+                // "activity" scripts handle their own UI via WindowModule popup
+                if (info.display != "activity" && result != null) {
+                    showDialogResult(result)
                 }
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "执行失败: ${e.message}", Toast.LENGTH_SHORT).show()
             }
         }
     }
