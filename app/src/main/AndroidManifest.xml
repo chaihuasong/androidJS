@@ -3,9 +3,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application
-        android:name=".demo.DemoApplication"
+        android:name=".demo.ClawdbotApplication"
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -28,6 +30,17 @@
             android:name="com.example.androidjs.accounting.ui.AccountingActivity"
             android:exported="false"
             android:label="智能记账" />
+
+        <!-- Chat Activity -->
+        <activity
+            android:name=".chat.ChatActivity"
+            android:exported="false"
+            android:label="Clawdbot" />
+
+        <!-- Alarm Receiver -->
+        <receiver
+            android:name="com.example.androidjs.core.modules.AlarmReceiver"
+            android:exported="false" />
 
         <!-- Quran Widget Provider -->
         <receiver

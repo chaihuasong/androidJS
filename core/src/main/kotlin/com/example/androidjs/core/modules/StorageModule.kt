@@ -46,6 +46,15 @@ class StorageModule(context: Context) : NativeModule {
                     .mapValues { it.value.toString() }
                 json.encodeToString(StorageAllResult.serializer(), StorageAllResult(all))
             }
+            "has" -> {
+                val args = json.decodeFromString<StorageKeyArgs>(argsJson)
+                val exists = prefs.contains(args.key)
+                json.encodeToString(StorageHasResult.serializer(), StorageHasResult(exists))
+            }
+            "keys" -> {
+                val keys = prefs.all.keys.toList()
+                json.encodeToString(StorageKeysResult.serializer(), StorageKeysResult(keys))
+            }
             else -> {
                 Log.w(TAG, "Unknown method: $method")
                 null
@@ -64,6 +73,12 @@ class StorageModule(context: Context) : NativeModule {
 
     @Serializable
     private data class StorageAllResult(val entries: Map<String, String>)
+
+    @Serializable
+    private data class StorageHasResult(val exists: Boolean)
+
+    @Serializable
+    private data class StorageKeysResult(val keys: List<String>)
 
     companion object {
         private const val TAG = "StorageModule"

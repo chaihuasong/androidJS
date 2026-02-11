@@ -10,7 +10,7 @@
         android:id="@+id/text_app_title"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="AndroidJS SDK Demo"
+        android:text="Clawdbot"
         android:textSize="28sp"
         android:textStyle="bold"
         android:textColor="#212121"
@@ -25,7 +25,7 @@
         android:id="@+id/text_subtitle"
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:text="动态 JavaScript 执行引擎"
+        android:text="AI Agent on Your Phone"
         android:textSize="14sp"
         android:textColor="#757575"
         android:gravity="center"
@@ -165,6 +165,19 @@
         android:padding="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <!-- Chat FAB -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fab_chat"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="24dp"
+        android:src="@drawable/ic_chat"
+        android:contentDescription="Chat with Clawdbot"
+        app:backgroundTint="@color/clawdbot_primary"
+        app:tint="#FFFFFF"
+        app:layout_constraintBottom_toTopOf="@id/text_engine_status"
         app:layout_constraintEnd_toEndOf="parent" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

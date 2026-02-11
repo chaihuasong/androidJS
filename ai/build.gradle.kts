@@ -2,10 +2,11 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
 }
 
 android {
-    namespace = "com.example.androidjs.core"
+    namespace = "com.example.androidjs.ai"
     compileSdk = 35
 
     defaultConfig {
@@ -24,11 +25,16 @@ android {
 }
 
 dependencies {
+    implementation(project(":core"))
     implementation(libs.kotlin.stdlib)
     implementation(libs.coroutines.core)
     implementation(libs.coroutines.android)
     implementation(libs.serialization.json)
     implementation(libs.core.ktx)
-    implementation(libs.appcompat)
     implementation(libs.okhttp)
+    implementation(libs.okhttp.sse)
+    implementation(libs.security.crypto)
+    implementation(libs.room.runtime)
+    implementation(libs.room.ktx)
+    ksp(libs.room.compiler)
 }

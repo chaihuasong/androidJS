@@ -36,6 +36,14 @@ class NetworkModule : NativeModule {
                 val args = json.decodeFromString<NetworkPostArgs>(argsJson)
                 executePost(args)
             }
+            "put" -> {
+                val args = json.decodeFromString<NetworkPostArgs>(argsJson)
+                executePut(args)
+            }
+            "delete" -> {
+                val args = json.decodeFromString<NetworkGetArgs>(argsJson)
+                executeDelete(args)
+            }
             else -> {
                 Log.w(TAG, "Unknown method: $method")
                 null
@@ -87,6 +95,50 @@ class NetworkModule : NativeModule {
             )
         } catch (e: Exception) {
             Log.e(TAG, "POST request failed", e)
+            json.encodeToString(
+                NetworkResponse.serializer(),
+                NetworkResponse(-1, "", e.message)
+            )
+        }
+    }
+
+    private fun executePut(args: NetworkPostArgs): String {
+        return try {
+            val mediaType = (args.contentType ?: "application/json").toMediaTypeOrNull()
+            val body = (args.body ?: "").toRequestBody(mediaType)
+            val requestBuilder = Request.Builder().url(args.url).put(body)
+            args.headers?.forEach { (key, value) ->
+                requestBuilder.addHeader(key, value)
+            }
+            val response = client.newCall(requestBuilder.build()).execute()
+            val responseBody = response.body?.string() ?: ""
+            json.encodeToString(
+                NetworkResponse.serializer(),
+                NetworkResponse(response.code, responseBody)
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "PUT request failed", e)
+            json.encodeToString(
+                NetworkResponse.serializer(),
+                NetworkResponse(-1, "", e.message)
+            )
+        }
+    }
+
+    private fun executeDelete(args: NetworkGetArgs): String {
+        return try {
+            val requestBuilder = Request.Builder().url(args.url).delete()
+            args.headers?.forEach { (key, value) ->
+                requestBuilder.addHeader(key, value)
+            }
+            val response = client.newCall(requestBuilder.build()).execute()
+            val body = response.body?.string() ?: ""
+            json.encodeToString(
+                NetworkResponse.serializer(),
+                NetworkResponse(response.code, body)
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "DELETE request failed", e)
             json.encodeToString(
                 NetworkResponse.serializer(),
                 NetworkResponse(-1, "", e.message)

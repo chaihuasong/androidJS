@@ -10,10 +10,12 @@ import androidx.lifecycle.lifecycleScope
 import com.example.androidjs.R
 import com.example.androidjs.accounting.AccountingPlugin
 import com.example.androidjs.accounting.ui.AccountingActivity
+import com.example.androidjs.chat.ChatActivity
 import com.example.androidjs.core.AndroidJSEngine
 import com.example.androidjs.widget.WidgetPlugin
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -33,6 +35,12 @@ class MainActivity : AppCompatActivity() {
         setupWidgetDemo()
         setupAccountingDemo()
         initEngine()
+
+        // FAB to open chat
+        val fabChat = findViewById<FloatingActionButton>(R.id.fab_chat)
+        fabChat.setOnClickListener {
+            startActivity(Intent(this, ChatActivity::class.java))
+        }
     }
 
     private fun initEngine() {
@@ -51,7 +59,7 @@ class MainActivity : AppCompatActivity() {
                     .build()
 
                 engine.initialize()
-                textEngineStatus.text = "AndroidJS Engine 已就绪 ✓"
+                textEngineStatus.text = "Clawdbot Engine Ready"
             } catch (e: Exception) {
                 textEngineStatus.text = "引擎初始化失败: ${e.message}"
             }
@@ -83,11 +91,11 @@ class MainActivity : AppCompatActivity() {
 
                         val verse = json.decodeFromString<QuranVerse>(cleanResult)
                         textResult.text = buildString {
-                            appendLine("📖 ${verse.arabic}")
+                            appendLine("${verse.arabic}")
                             appendLine()
-                            appendLine("🌍 ${verse.translation}")
+                            appendLine("${verse.translation}")
                             appendLine()
-                            append("📌 ${verse.reference} | ${verse.date}")
+                            append("${verse.reference} | ${verse.date}")
                         }
                         cardResult.visibility = View.VISIBLE
                     }

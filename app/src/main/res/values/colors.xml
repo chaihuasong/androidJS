@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="clawdbot_primary">#D97706</color>
+    <color name="clawdbot_primary_dark">#B45309</color>
+    <color name="clawdbot_on_primary">#FFFFFF</color>
+</resources>

@@ -15,9 +15,10 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "androidJS"
+rootProject.name = "Clawdbot"
 
 include(":core")
+include(":ai")
 include(":scene-widget")
 include(":scene-accounting")
 include(":app")
