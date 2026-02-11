@@ -23,7 +23,7 @@ object ApiKeySetupDialog {
 
         AlertDialog.Builder(context)
             .setTitle("Configure API Key")
-            .setMessage("Enter your DeepSeek API key to start chatting.")
+            .setMessage("Enter your Clawbot API key to start chatting.")
             .setView(container)
             .setPositiveButton("Save") { _, _ ->
                 val key = editText.text.toString().trim()

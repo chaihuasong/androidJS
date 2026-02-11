@@ -8,6 +8,7 @@ import com.example.androidjs.ai.conversation.SystemPromptBuilder
 import com.example.androidjs.ai.model.ChatRequest
 import com.example.androidjs.ai.model.Message
 import com.example.androidjs.ai.persistence.ChatDatabase
+import com.example.androidjs.ai.persistence.ConversationEntity
 import com.example.androidjs.ai.service.ApiKeyManager
 import com.example.androidjs.ai.service.ClawdbotAIService
 import com.example.androidjs.ai.tools.OrchestratorEvent
@@ -37,8 +38,18 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     private val _needsApiKey = MutableStateFlow(!apiKeyManager.hasApiKey())
     val needsApiKey: StateFlow<Boolean> = _needsApiKey.asStateFlow()
 
+    private val _conversations = MutableStateFlow<List<ConversationEntity>>(emptyList())
+    val conversations: StateFlow<List<ConversationEntity>> = _conversations.asStateFlow()
+
+    private val _currentConversationId = MutableStateFlow(-1L)
+    val currentConversationId: StateFlow<Long> = _currentConversationId.asStateFlow()
+
     private val conversationMessages = mutableListOf<Message>()
     private var conversationId: Long = -1
+
+    init {
+        loadConversations()
+    }
 
     fun setApiKey(key: String) {
         apiKeyManager.setApiKey(key)
@@ -46,6 +57,57 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun hasApiKey(): Boolean = apiKeyManager.hasApiKey()
+
+    fun loadConversations() {
+        viewModelScope.launch {
+            _conversations.value = conversationManager.getConversations()
+        }
+    }
+
+    fun loadConversation(id: Long) {
+        if (id == conversationId) return
+        viewModelScope.launch {
+            conversationMessages.clear()
+            val messages = conversationManager.getMessages(id)
+            conversationMessages.addAll(messages)
+            conversationId = id
+            _currentConversationId.value = id
+
+            // Rebuild chat items from messages
+            val items = mutableListOf<ChatItem>()
+            for (msg in messages) {
+                when (msg) {
+                    is Message.UserMessage -> items.add(ChatItem.UserMsg(msg.content))
+                    is Message.AssistantMessage -> {
+                        if (msg.content.isNotBlank()) {
+                            items.add(ChatItem.AssistantMsg(msg.content, isStreaming = false))
+                        }
+                    }
+                    is Message.ToolResultMessage -> {
+                        // Tool results are shown inline during streaming; skip in history
+                    }
+                }
+            }
+            _chatItems.value = items
+        }
+    }
+
+    fun deleteConversation(id: Long) {
+        viewModelScope.launch {
+            conversationManager.deleteConversation(id)
+            if (conversationId == id) {
+                newConversation()
+            }
+            loadConversations()
+        }
+    }
+
+    fun newConversation() {
+        conversationMessages.clear()
+        _chatItems.value = emptyList()
+        conversationId = -1
+        _currentConversationId.value = -1
+    }
 
     fun sendMessage(text: String) {
         if (text.isBlank() || _isLoading.value) return
@@ -56,6 +118,8 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                 conversationId = conversationManager.createConversation(
                     text.take(50)
                 )
+                _currentConversationId.value = conversationId
+                loadConversations()
             }
 
             // Add user message
@@ -142,6 +206,9 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
                             )
                             conversationMessages.add(assistantMsg)
                             conversationManager.addMessage(conversationId, assistantMsg)
+
+                            // Refresh conversation list (update time)
+                            loadConversations()
                         }
 
                         is OrchestratorEvent.Error -> {
@@ -161,8 +228,6 @@ class ChatViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearConversation() {
-        conversationMessages.clear()
-        _chatItems.value = emptyList()
-        conversationId = -1
+        newConversation()
     }
 }
