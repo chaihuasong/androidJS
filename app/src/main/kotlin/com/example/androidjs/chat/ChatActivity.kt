@@ -158,7 +158,8 @@ class ChatActivity : AppCompatActivity() {
             DeviceInfoModule(applicationContext),
             NotificationModule(applicationContext),
             FileModule(applicationContext),
-            AlarmModule(applicationContext)
+            AlarmModule(applicationContext),
+            AdbModule()
         )
 
         for (module in modules) {

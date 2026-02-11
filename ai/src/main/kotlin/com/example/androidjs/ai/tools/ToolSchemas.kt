@@ -23,6 +23,7 @@ object ToolSchemas {
             "notification" -> notificationTools()
             "file" -> fileTools()
             "alarm" -> alarmTools()
+            "adb" -> adbTools()
             else -> emptyList()
         }
     }
@@ -272,6 +273,18 @@ object ToolSchemas {
         )
     )
 
+    private fun adbTools() = listOf(
+        ToolDefinition(
+            name = "adb_shell",
+            description = "Execute a shell command on the device (like adb shell). Returns stdout, stderr, and exitCode. Useful for getting system info, listing processes, checking properties, etc.",
+            inputSchema = objectSchema(
+                "command" to stringProp("Shell command to execute (e.g., 'getprop ro.product.model', 'ps', 'ls /data/local/tmp')"),
+                "timeout" to intPropOptional("Command timeout in seconds (default: 30, max: 120)"),
+                required = listOf("command")
+            )
+        )
+    )
+
     // --- Schema builder helpers ---
 
     private fun emptyObjectSchema(): JsonObject = buildJsonObject {
@@ -306,6 +319,11 @@ object ToolSchemas {
     }
 
     private fun intProp(desc: String) = buildJsonObject {
+        put("type", "integer")
+        put("description", desc)
+    }
+
+    private fun intPropOptional(desc: String) = buildJsonObject {
         put("type", "integer")
         put("description", desc)
     }
