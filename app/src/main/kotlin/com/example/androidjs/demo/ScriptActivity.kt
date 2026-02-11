@@ -16,8 +16,6 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.androidjs.R
 import com.example.androidjs.core.AndroidJSEngine
-import com.example.androidjs.core.modules.DatabaseModule
-import com.example.androidjs.core.modules.VoiceModule
 import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -74,8 +72,6 @@ class ScriptActivity : AppCompatActivity() {
             try {
                 engine = AndroidJSEngine.Builder(applicationContext)
                     .addModule(uiModule)
-                    .addModule(DatabaseModule(applicationContext))
-                    .addModule(VoiceModule(applicationContext))
                     .setExecutionTimeout(10_000)
                     .build()
                 engine.initialize()

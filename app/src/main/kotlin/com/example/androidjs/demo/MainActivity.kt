@@ -12,10 +12,8 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.example.androidjs.R
 import com.example.androidjs.core.AndroidJSEngine
-import com.example.androidjs.core.modules.WidgetModule
 import com.example.androidjs.core.script.ScriptInfo
 import com.example.androidjs.core.script.ScriptManager
-import com.example.androidjs.widget.ScriptWidgetProvider
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -65,7 +63,6 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             try {
                 engine = AndroidJSEngine.Builder(applicationContext)
-                    .addModule(WidgetModule(applicationContext, ScriptWidgetProvider::class.java, R.layout.widget_script))
                     .setMemoryLimit(16 * 1024 * 1024)
                     .setExecutionTimeout(5000)
                     .build()

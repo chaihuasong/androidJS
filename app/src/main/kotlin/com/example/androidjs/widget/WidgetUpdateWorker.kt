@@ -4,9 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.androidjs.R
 import com.example.androidjs.core.AndroidJSEngine
-import com.example.androidjs.core.modules.WidgetModule
 import com.example.androidjs.core.script.ScriptManager
 
 /**
@@ -23,14 +21,7 @@ class WidgetUpdateWorker(
         Log.d(TAG, "Starting widget update work")
 
         return try {
-            val widgetModule = WidgetModule(
-                applicationContext,
-                ScriptWidgetProvider::class.java,
-                R.layout.widget_script
-            )
-
             val engine = AndroidJSEngine.Builder(applicationContext)
-                .addModule(widgetModule)
                 .setExecutionTimeout(10_000)
                 .build()
 

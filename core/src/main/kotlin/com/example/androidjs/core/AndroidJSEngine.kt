@@ -5,9 +5,6 @@ import android.util.Log
 import com.example.androidjs.core.bridge.BridgeDispatcher
 import com.example.androidjs.core.engine.JSContext
 import com.example.androidjs.core.engine.JSEngine
-import com.example.androidjs.core.modules.LogModule
-import com.example.androidjs.core.modules.NetworkModule
-import com.example.androidjs.core.modules.StorageModule
 import com.example.androidjs.core.bridge.NativeModule
 
 /**
@@ -30,8 +27,7 @@ class AndroidJSEngine private constructor(
     private val appContext: Context,
     private val modules: List<NativeModule>,
     private val memoryLimit: Long,
-    private val executionTimeout: Long,
-    private val enableBuiltinModules: Boolean
+    private val executionTimeout: Long
 ) {
     private val dispatcher = BridgeDispatcher()
     private val jsContext = JSContext(memoryLimit, executionTimeout)
@@ -42,14 +38,7 @@ class AndroidJSEngine private constructor(
      * Must be called before executing any scripts.
      */
     suspend fun initialize() {
-        // Register built-in modules
-        if (enableBuiltinModules) {
-            dispatcher.registerModule(LogModule())
-            dispatcher.registerModule(StorageModule(appContext))
-            dispatcher.registerModule(NetworkModule())
-        }
-
-        // Register additional modules
+        // Register modules
         for (module in modules) {
             dispatcher.registerModule(module)
             Log.d(TAG, "Module registered: ${module.name}")
@@ -108,8 +97,6 @@ class AndroidJSEngine private constructor(
         private val modules = mutableListOf<NativeModule>()
         private var memoryLimit = JSContext.DEFAULT_MEMORY_LIMIT
         private var executionTimeout = JSContext.DEFAULT_EXECUTION_TIMEOUT
-        private var enableBuiltinModules = true
-
         fun addModule(module: NativeModule) = apply {
             modules.add(module)
         }
@@ -122,17 +109,12 @@ class AndroidJSEngine private constructor(
             executionTimeout = millis
         }
 
-        fun setEnableBuiltinModules(enable: Boolean) = apply {
-            enableBuiltinModules = enable
-        }
-
         fun build(): AndroidJSEngine {
             return AndroidJSEngine(
                 appContext = context.applicationContext,
                 modules = modules.toList(),
                 memoryLimit = memoryLimit,
-                executionTimeout = executionTimeout,
-                enableBuiltinModules = enableBuiltinModules
+                executionTimeout = executionTimeout
             )
         }
     }
