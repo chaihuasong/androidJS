@@ -18,8 +18,8 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * Clawdbot API implementation of AIService.
- * Uses OkHttp for HTTP requests and SSE streaming.
+ * DeepSeek API implementation of AIService.
+ * Uses OpenAI-compatible format with OkHttp SSE streaming.
  */
 class ClawdbotAIService(
     private val apiKeyProvider: () -> String?
@@ -50,9 +50,8 @@ class ClawdbotAIService(
             val requestBody = buildRequestJson(request, stream = false)
             val httpRequest = Request.Builder()
                 .url(API_URL)
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", API_VERSION)
-                .header("content-type", "application/json")
+                .header("Authorization", "Bearer $apiKey")
+                .header("Content-Type", "application/json")
                 .post(requestBody.toRequestBody("application/json".toMediaType()))
                 .build()
 
@@ -75,21 +74,18 @@ class ClawdbotAIService(
         val requestBody = buildRequestJson(request, stream = true)
         val httpRequest = Request.Builder()
             .url(API_URL)
-            .header("x-api-key", apiKey)
-            .header("anthropic-version", API_VERSION)
-            .header("content-type", "application/json")
+            .header("Authorization", "Bearer $apiKey")
+            .header("Content-Type", "application/json")
             .post(requestBody.toRequestBody("application/json".toMediaType()))
             .build()
 
         val sseFactory = EventSources.createFactory(client)
 
-        var contentText = StringBuilder()
-        var toolUseBlocks = mutableListOf<ToolUseBlock>()
-        var currentToolId = ""
-        var currentToolName = ""
-        var currentToolInput = StringBuilder()
+        val contentText = StringBuilder()
+        val toolCalls = mutableMapOf<Int, ToolCallAccumulator>()
         var inputTokens = 0
         var outputTokens = 0
+        var finishReason = ""
 
         val listener = object : EventSourceListener() {
             override fun onEvent(
@@ -99,86 +95,84 @@ class ClawdbotAIService(
                 data: String
             ) {
                 try {
-                    if (data == "[DONE]") return
+                    if (data == "[DONE]") {
+                        // Build final response
+                        val toolUseBlocks = toolCalls.values.map { acc ->
+                            val inputJson = try {
+                                json.parseToJsonElement(acc.arguments.toString()).jsonObject
+                            } catch (e: Exception) {
+                                JsonObject(emptyMap())
+                            }
+                            ToolUseBlock(acc.id, acc.name, inputJson)
+                        }
 
-                    val jsonData = json.parseToJsonElement(data).jsonObject
-                    when (type) {
-                        "message_start" -> {
-                            val usage = jsonData["message"]?.jsonObject?.get("usage")?.jsonObject
-                            inputTokens = usage?.get("input_tokens")?.jsonPrimitive?.int ?: 0
-                        }
-                        "content_block_start" -> {
-                            val block = jsonData["content_block"]?.jsonObject ?: return
-                            when (block["type"]?.jsonPrimitive?.content) {
-                                "text" -> { /* text block started */ }
-                                "tool_use" -> {
-                                    currentToolId = block["id"]?.jsonPrimitive?.content ?: ""
-                                    currentToolName = block["name"]?.jsonPrimitive?.content ?: ""
-                                    currentToolInput = StringBuilder()
-                                    trySend(StreamEvent.ToolUseStart(currentToolId, currentToolName))
-                                }
-                            }
-                        }
-                        "content_block_delta" -> {
-                            val delta = jsonData["delta"]?.jsonObject ?: return
-                            when (delta["type"]?.jsonPrimitive?.content) {
-                                "text_delta" -> {
-                                    val text = delta["text"]?.jsonPrimitive?.content ?: ""
-                                    contentText.append(text)
-                                    trySend(StreamEvent.TextDelta(text))
-                                }
-                                "input_json_delta" -> {
-                                    val partial = delta["partial_json"]?.jsonPrimitive?.content ?: ""
-                                    currentToolInput.append(partial)
-                                    trySend(StreamEvent.ToolUseDelta(partial))
-                                }
-                            }
-                        }
-                        "content_block_stop" -> {
-                            if (currentToolId.isNotEmpty()) {
-                                val inputJson = try {
-                                    json.parseToJsonElement(currentToolInput.toString()).jsonObject
-                                } catch (e: Exception) {
-                                    JsonObject(emptyMap())
-                                }
-                                toolUseBlocks.add(
-                                    ToolUseBlock(currentToolId, currentToolName, inputJson)
-                                )
-                                currentToolId = ""
-                                currentToolName = ""
-                                trySend(StreamEvent.ToolUseEnd)
-                            }
-                        }
-                        "message_delta" -> {
-                            val delta = jsonData["delta"]?.jsonObject
-                            val stopReason = delta?.get("stop_reason")?.jsonPrimitive?.content ?: ""
-                            val usage = jsonData["usage"]?.jsonObject
-                            outputTokens = usage?.get("output_tokens")?.jsonPrimitive?.int ?: 0
-
-                            trySend(
-                                StreamEvent.MessageComplete(
-                                    ChatResponse(
-                                        content = contentText.toString(),
-                                        toolUse = toolUseBlocks.toList(),
-                                        stopReason = stopReason,
-                                        usage = TokenUsage(inputTokens, outputTokens)
-                                    )
+                        trySend(
+                            StreamEvent.MessageComplete(
+                                ChatResponse(
+                                    content = contentText.toString(),
+                                    toolUse = toolUseBlocks,
+                                    stopReason = if (finishReason == "tool_calls") "tool_use" else finishReason,
+                                    usage = TokenUsage(inputTokens, outputTokens)
                                 )
                             )
-                        }
-                        "message_stop" -> {
-                            close()
-                        }
-                        "error" -> {
-                            val error = jsonData["error"]?.jsonObject
-                            val message = error?.get("message")?.jsonPrimitive?.content
-                                ?: "Unknown error"
-                            trySend(StreamEvent.Error(message))
-                            close()
+                        )
+                        close()
+                        return
+                    }
+
+                    val jsonData = json.parseToJsonElement(data).jsonObject
+                    val choices = jsonData["choices"]?.jsonArray
+                    val choice = choices?.firstOrNull()?.jsonObject ?: return
+                    val delta = choice["delta"]?.jsonObject ?: return
+
+                    // Check finish_reason
+                    choice["finish_reason"]?.let {
+                        if (it !is JsonNull) {
+                            finishReason = it.jsonPrimitive.content
                         }
                     }
+
+                    // Text content delta
+                    delta["content"]?.let {
+                        if (it !is JsonNull) {
+                            val text = it.jsonPrimitive.content
+                            contentText.append(text)
+                            trySend(StreamEvent.TextDelta(text))
+                        }
+                    }
+
+                    // Tool calls delta
+                    delta["tool_calls"]?.jsonArray?.forEach { tcElement ->
+                        val tc = tcElement.jsonObject
+                        val index = tc["index"]?.jsonPrimitive?.int ?: 0
+                        val function = tc["function"]?.jsonObject
+
+                        if (tc.containsKey("id")) {
+                            // New tool call start
+                            val toolId = tc["id"]?.jsonPrimitive?.content ?: "call_$index"
+                            val toolName = function?.get("name")?.jsonPrimitive?.content ?: ""
+                            toolCalls[index] = ToolCallAccumulator(toolId, toolName)
+                            trySend(StreamEvent.ToolUseStart(toolId, toolName))
+                        }
+
+                        // Accumulate arguments
+                        function?.get("arguments")?.let {
+                            if (it !is JsonNull) {
+                                val argChunk = it.jsonPrimitive.content
+                                toolCalls[index]?.arguments?.append(argChunk)
+                                trySend(StreamEvent.ToolUseDelta(argChunk))
+                            }
+                        }
+                    }
+
+                    // Usage info (DeepSeek sends usage in the last chunk)
+                    jsonData["usage"]?.jsonObject?.let { usage ->
+                        inputTokens = usage["prompt_tokens"]?.jsonPrimitive?.int ?: inputTokens
+                        outputTokens = usage["completion_tokens"]?.jsonPrimitive?.int ?: outputTokens
+                    }
+
                 } catch (e: Exception) {
-                    Log.e(TAG, "Error parsing SSE event", e)
+                    Log.e(TAG, "Error parsing SSE event: $data", e)
                     trySend(StreamEvent.Error(e.message ?: "Parse error"))
                 }
             }
@@ -206,56 +200,66 @@ class ClawdbotAIService(
         }
     }
 
+    /**
+     * Build OpenAI-compatible request JSON for DeepSeek API.
+     */
     private fun buildRequestJson(request: ChatRequest, stream: Boolean): String {
         val root = buildJsonObject {
             put("model", MODEL)
             put("max_tokens", request.maxTokens)
             put("stream", stream)
 
-            if (request.systemPrompt != null) {
-                put("system", request.systemPrompt)
-            }
-
             putJsonArray("messages") {
-                for (msg in request.messages) {
+                // System prompt as first message
+                if (request.systemPrompt != null) {
                     addJsonObject {
-                        when (msg) {
-                            is Message.UserMessage -> {
+                        put("role", "system")
+                        put("content", request.systemPrompt)
+                    }
+                }
+
+                for (msg in request.messages) {
+                    when (msg) {
+                        is Message.UserMessage -> {
+                            addJsonObject {
                                 put("role", "user")
                                 put("content", msg.content)
                             }
-                            is Message.AssistantMessage -> {
+                        }
+                        is Message.AssistantMessage -> {
+                            addJsonObject {
                                 put("role", "assistant")
-                                putJsonArray("content") {
+                                if (msg.toolUse.isNotEmpty()) {
+                                    // Assistant message with tool calls
                                     if (msg.content.isNotEmpty()) {
-                                        addJsonObject {
-                                            put("type", "text")
-                                            put("text", msg.content)
-                                        }
+                                        put("content", msg.content)
+                                    } else {
+                                        put("content", JsonNull)
                                     }
-                                    for (tool in msg.toolUse) {
-                                        addJsonObject {
-                                            put("type", "tool_use")
-                                            put("id", tool.id)
-                                            put("name", tool.name)
-                                            put("input", tool.input)
-                                        }
-                                    }
-                                }
-                            }
-                            is Message.ToolResultMessage -> {
-                                put("role", "user")
-                                putJsonArray("content") {
-                                    for (result in msg.toolResults) {
-                                        addJsonObject {
-                                            put("type", "tool_result")
-                                            put("tool_use_id", result.toolUseId)
-                                            put("content", result.content)
-                                            if (result.isError) {
-                                                put("is_error", true)
+                                    putJsonArray("tool_calls") {
+                                        for (tool in msg.toolUse) {
+                                            addJsonObject {
+                                                put("id", tool.id)
+                                                put("type", "function")
+                                                putJsonObject("function") {
+                                                    put("name", tool.name)
+                                                    put("arguments", tool.input.toString())
+                                                }
                                             }
                                         }
                                     }
+                                } else {
+                                    put("content", msg.content)
+                                }
+                            }
+                        }
+                        is Message.ToolResultMessage -> {
+                            // Each tool result is a separate "tool" role message
+                            for (result in msg.toolResults) {
+                                addJsonObject {
+                                    put("role", "tool")
+                                    put("tool_call_id", result.toolUseId)
+                                    put("content", result.content)
                                 }
                             }
                         }
@@ -263,13 +267,17 @@ class ClawdbotAIService(
                 }
             }
 
+            // Tools in OpenAI format
             if (!request.tools.isNullOrEmpty()) {
                 putJsonArray("tools") {
                     for (tool in request.tools) {
                         addJsonObject {
-                            put("name", tool.name)
-                            put("description", tool.description)
-                            put("input_schema", tool.inputSchema)
+                            put("type", "function")
+                            putJsonObject("function") {
+                                put("name", tool.name)
+                                put("description", tool.description)
+                                put("parameters", tool.inputSchema)
+                            }
                         }
                     }
                 }
@@ -278,48 +286,65 @@ class ClawdbotAIService(
         return root.toString()
     }
 
+    /**
+     * Parse non-streaming response in OpenAI format.
+     */
     private fun parseFullResponse(body: String): ChatResponse {
         val root = json.parseToJsonElement(body).jsonObject
+        val choices = root["choices"]?.jsonArray
+        val choice = choices?.firstOrNull()?.jsonObject ?: return ChatResponse()
+        val message = choice["message"]?.jsonObject ?: return ChatResponse()
 
-        val content = root["content"]?.jsonArray ?: return ChatResponse()
-        var text = ""
+        val text = message["content"]?.let {
+            if (it is JsonNull) "" else it.jsonPrimitive.content
+        } ?: ""
+
         val toolUses = mutableListOf<ToolUseBlock>()
-
-        for (block in content) {
-            val obj = block.jsonObject
-            when (obj["type"]?.jsonPrimitive?.content) {
-                "text" -> text = obj["text"]?.jsonPrimitive?.content ?: ""
-                "tool_use" -> {
-                    toolUses.add(
-                        ToolUseBlock(
-                            id = obj["id"]?.jsonPrimitive?.content ?: "",
-                            name = obj["name"]?.jsonPrimitive?.content ?: "",
-                            input = obj["input"]?.jsonObject ?: JsonObject(emptyMap())
-                        )
-                    )
-                }
+        message["tool_calls"]?.jsonArray?.forEach { tcElement ->
+            val tc = tcElement.jsonObject
+            val function = tc["function"]?.jsonObject
+            val argsStr = function?.get("arguments")?.jsonPrimitive?.content ?: "{}"
+            val argsJson = try {
+                json.parseToJsonElement(argsStr).jsonObject
+            } catch (e: Exception) {
+                JsonObject(emptyMap())
             }
+            toolUses.add(
+                ToolUseBlock(
+                    id = tc["id"]?.jsonPrimitive?.content ?: "",
+                    name = function?.get("name")?.jsonPrimitive?.content ?: "",
+                    input = argsJson
+                )
+            )
         }
 
-        val stopReason = root["stop_reason"]?.jsonPrimitive?.content ?: ""
+        val finishReason = choice["finish_reason"]?.jsonPrimitive?.content ?: ""
         val usage = root["usage"]?.jsonObject
         val tokenUsage = TokenUsage(
-            inputTokens = usage?.get("input_tokens")?.jsonPrimitive?.int ?: 0,
-            outputTokens = usage?.get("output_tokens")?.jsonPrimitive?.int ?: 0
+            inputTokens = usage?.get("prompt_tokens")?.jsonPrimitive?.int ?: 0,
+            outputTokens = usage?.get("completion_tokens")?.jsonPrimitive?.int ?: 0
         )
 
         return ChatResponse(
             content = text,
             toolUse = toolUses,
-            stopReason = stopReason,
+            stopReason = if (finishReason == "tool_calls") "tool_use" else finishReason,
             usage = tokenUsage
         )
     }
 
+    /**
+     * Accumulator for streaming tool call chunks.
+     */
+    private data class ToolCallAccumulator(
+        val id: String,
+        val name: String,
+        val arguments: StringBuilder = StringBuilder()
+    )
+
     companion object {
         private const val TAG = "ClawdbotAIService"
-        private const val API_URL = "https://api.anthropic.com/v1/messages"
-        private const val API_VERSION = "2023-06-01"
-        private const val MODEL = "claude-sonnet-4-5-20250929"
+        private const val API_URL = "https://api.deepseek.com/chat/completions"
+        private const val MODEL = "deepseek-chat"
     }
 }

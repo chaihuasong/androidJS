@@ -10,7 +10,7 @@ object ApiKeySetupDialog {
 
     fun show(context: Context, onApiKeySet: (String) -> Unit) {
         val editText = EditText(context).apply {
-            hint = "sk-ant-..."
+            hint = "sk-..."
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
             isSingleLine = true
         }
@@ -23,7 +23,7 @@ object ApiKeySetupDialog {
 
         AlertDialog.Builder(context)
             .setTitle("Configure API Key")
-            .setMessage("Enter your Clawdbot API key to start chatting.")
+            .setMessage("Enter your DeepSeek API key to start chatting.")
             .setView(container)
             .setPositiveButton("Save") { _, _ ->
                 val key = editText.text.toString().trim()
