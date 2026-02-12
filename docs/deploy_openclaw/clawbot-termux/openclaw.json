@@ -1,0 +1,82 @@
+{
+  // ClawBot — Termux Gateway Configuration
+
+  agents: {
+    defaults: {
+      workspace: "~/.openclaw/workspace",
+      model: {
+        primary: "deepseek/deepseek-chat",
+      },
+    },
+    list: [
+      {
+        id: "default",
+        default: true,
+        identity: {
+          name: "ClawBot",
+          theme: "Android phone assistant that controls hardware via Termux:API",
+          emoji: "🤖",
+        },
+      },
+    ],
+  },
+
+  models: {
+    providers: {
+      deepseek: {
+        baseUrl: "https://api.deepseek.com",
+        apiKey: "${DEEPSEEK_API_KEY}",
+        api: "openai-completions",
+        models: [
+          { id: "deepseek-chat", name: "DeepSeek Chat" },
+          { id: "deepseek-reasoner", name: "DeepSeek Reasoner" },
+        ],
+      },
+      siliconflow: {
+        baseUrl: "https://api.siliconflow.cn/v1",
+        apiKey: "${SILICONFLOW_API_KEY}",
+        api: "openai-completions",
+        models: [
+          { id: "deepseek-ai/deepseek-vl2", name: "DeepSeek VL2 (Vision)" },
+          { id: "Qwen/Qwen2-VL-72B-Instruct", name: "Qwen2 VL 72B" },
+        ],
+      },
+    },
+  },
+
+  gateway: {
+    mode: "local",
+    port: 18789,
+    bind: "lan",
+
+    controlUi: {
+      enabled: true,
+      allowInsecureAuth: true,
+      dangerouslyDisableDeviceAuth: true,
+      allowedOrigins: ["http://114.55.130.197:18790"],
+    },
+
+    trustedProxies: ["127.0.0.1"],
+
+    auth: {
+      mode: "token",
+      token: "${OPENCLAW_GATEWAY_TOKEN}",
+    },
+  },
+
+  logging: {
+    level: "info",
+    file: "/data/data/com.termux/files/usr/tmp/openclaw/openclaw.log",
+  },
+
+  tools: {
+    allow: ["exec", "bash"],
+  },
+
+  skills: {
+    load: {
+      extraDirs: ["~/.openclaw/workspace/skills"],
+      watch: true,
+    },
+  },
+}
