@@ -1,16 +1,15 @@
 package com.example.androidjs.widget
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.androidjs.core.AndroidJSEngine
-import com.example.androidjs.core.script.ScriptManager
 
 /**
- * WorkManager Worker that executes the Quran JS script
- * and updates the widget with the daily verse.
- * The JS script itself calls widget.updateText() to update the widget.
+ * WorkManager Worker for periodic widget updates.
+ * Executes JS script and applies result to widget via shared helper.
  */
 class WidgetUpdateWorker(
     appContext: Context,
@@ -21,22 +20,23 @@ class WidgetUpdateWorker(
         Log.d(TAG, "Starting widget update work")
 
         return try {
-            val engine = AndroidJSEngine.Builder(applicationContext)
-                .setExecutionTimeout(10_000)
-                .build()
-
-            engine.initialize()
-
-            val scriptManager = ScriptManager(applicationContext)
-            val cachedPath = scriptManager.getCachedScriptPath("quran_widget")
-            val result = if (cachedPath != null) {
-                engine.executeFileScript(cachedPath)
-            } else {
-                engine.executeAssetScript("js/quran_widget.js")
-            }
+            val result = ScriptWidgetProvider.executeWidgetScript(applicationContext)
             Log.d(TAG, "JS result: $result")
 
-            engine.destroy()
+            if (result != null && result != "null") {
+                val appWidgetManager = AppWidgetManager.getInstance(applicationContext)
+                val widgetIds = appWidgetManager.getAppWidgetIds(
+                    ComponentName(applicationContext, ScriptWidgetProvider::class.java)
+                )
+
+                if (widgetIds.isNotEmpty()) {
+                    ScriptWidgetProvider.applyResultToWidgets(
+                        applicationContext, appWidgetManager, widgetIds, result
+                    )
+                } else {
+                    Log.d(TAG, "No widget instances found")
+                }
+            }
 
             Log.d(TAG, "Widget update completed successfully")
             Result.success()

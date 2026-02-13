@@ -218,25 +218,16 @@ function getDailyVerse_internal() {
     };
 }
 
-// Execute: update widget and return dialog result
+// Execute: return structured result for both widget and dialog display
 (function() {
     var verse = getDailyVerse_internal();
 
-    // Update widget text fields (may silently fail if no widget exists)
-    try {
-        __bridge.invoke('widget', 'updateText', JSON.stringify({
-            text_line_1: verse.arabic,
-            text_line_2: verse.translation,
-            text_line_3: verse.reference,
-            text_line_4: verse.date
-        }));
-    } catch(e) {
-        // Widget module may not be registered — ignore
-    }
-
-    // Return formatted result for dialog display
     return JSON.stringify({
         title: '\u4eca\u65e5\u7ecf\u6587',
-        message: verse.arabic + '\n\n' + verse.translation + '\n\n' + verse.reference + ' | ' + verse.date
+        message: verse.arabic + '\n\n' + verse.translation + '\n\n' + verse.reference + ' | ' + verse.date,
+        text_line_1: verse.arabic,
+        text_line_2: verse.translation,
+        text_line_3: verse.reference,
+        text_line_4: verse.date
     });
 })();
