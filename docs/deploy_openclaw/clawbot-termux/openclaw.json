@@ -46,14 +46,14 @@
 
   gateway: {
     mode: "local",
-    port: 18789,
+    port: 28789,
     bind: "lan",
 
     controlUi: {
       enabled: true,
       allowInsecureAuth: true,
       dangerouslyDisableDeviceAuth: true,
-      allowedOrigins: ["http://114.55.130.197:18790"],
+      allowedOrigins: ["http://114.55.130.197:28790"],
     },
 
     trustedProxies: ["127.0.0.1"],

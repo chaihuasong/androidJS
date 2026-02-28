@@ -8,7 +8,7 @@ Supports: flashlight, camera + image description, sensors, phone calls.
 ```
 114.55.130.197 (Cloud)                  Android Phone (Termux)
 ┌────────────────────┐                 ┌─────────────────────────┐
-│  Nginx :18790      │◄─ SSH tunnel ──►│  OpenClaw Gateway :18789│
+│  Nginx :28790      │◄─ SSH tunnel ──►│  OpenClaw Gateway :28789│
 │  (reverse proxy)   │                 │         │                │
 │                    │                 │    AI Agent (Claude)     │
 │  Browser access    │                 │         │                │
@@ -62,8 +62,8 @@ This starts the Gateway and SSH tunnel in a tmux session.
 
 ### 5. Access from browser
 
-- **Local (same Wi-Fi):** `http://<phone-ip>:18789`
-- **Remote (anywhere):** `http://114.55.130.197:18790`
+- **Local (same Wi-Fi):** `http://<phone-ip>:28789`
+- **Remote (anywhere):** `http://114.55.130.197:28790`
 
 ## Demo Commands
 
@@ -98,5 +98,5 @@ clawbot-termux/
 | `termux-torch: not found` | Install Termux:API: `pkg install termux-api` |
 | Permission denied | Grant permissions in Android Settings → Apps → Termux:API |
 | SSH tunnel drops | The start script uses `ServerAliveInterval=60` to keep alive |
-| Gateway won't start | Check `~/.openclaw/openclaw.log` and ensure port 18789 is free |
-| Can't reach from cloud | Verify tunnel: `ssh root@114.55.130.197 'curl -s localhost:18789/health'` |
+| Gateway won't start | Check `~/.openclaw/openclaw.log` and ensure port 28789 is free |
+| Can't reach from cloud | Verify tunnel: `ssh root@114.55.130.197 'curl -s localhost:28789/health'` |

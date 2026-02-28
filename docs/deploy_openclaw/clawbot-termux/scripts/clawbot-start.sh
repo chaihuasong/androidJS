@@ -6,7 +6,7 @@
 set -euo pipefail
 
 CLOUD_SERVER="root@114.55.130.197"
-GATEWAY_PORT=18789
+GATEWAY_PORT=28789
 SESSION_NAME="clawbot"
 
 echo "=== Starting ClawBot ==="
@@ -41,7 +41,7 @@ echo "  Detach:   Ctrl+B, D"
 echo "  Switch:   Ctrl+B, N (next window)"
 echo ""
 echo "  Local UI: http://localhost:$GATEWAY_PORT"
-echo "  Remote:   http://114.55.130.197:18790"
+echo "  Remote:   http://114.55.130.197:28790"
 echo ""
 
 # Attach to the session

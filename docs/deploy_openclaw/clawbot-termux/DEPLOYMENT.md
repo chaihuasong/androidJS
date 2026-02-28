@@ -5,9 +5,9 @@
 ```
 用户浏览器                    云服务器 114.55.130.197              Android 手机 (Termux)
 ┌──────────┐                ┌─────────────────────┐            ┌──────────────────────────┐
-│ Web UI   │── HTTP/WS ──→ │  Nginx (:18790)      │            │  OpenClaw Gateway (:18789)│
+│ Web UI   │── HTTP/WS ──→ │  Nginx (:28790)      │            │  OpenClaw Gateway (:28789)│
 │ 聊天界面  │               │  反向代理             │◄─SSH隧道──│  (Node.js)               │
-└──────────┘                │  proxy_pass :18789   │  R 18789   │       ↓                  │
+└──────────┘                │  proxy_pass :28789   │  R 28789   │       ↓                  │
                             └─────────────────────┘            │  DeepSeek Chat (AI 模型)  │
                                                                │       ↓                  │
                                                                │  exec 工具 → bash         │
@@ -41,10 +41,10 @@
 
 ```nginx
 server {
-    listen 18790;
+    listen 28790;
     server_name _;
     location / {
-        proxy_pass http://127.0.0.1:18789;
+        proxy_pass http://127.0.0.1:28789;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
@@ -64,7 +64,7 @@ server {
 nginx -t && nginx -s reload
 ```
 
-服务器只做一件事：**Nginx 反向代理**，把外网 `:18790` 的请求转发到 `localhost:18789`（SSH 隧道映射过来的手机 Gateway）。
+服务器只做一件事：**Nginx 反向代理**，把外网 `:28790` 的请求转发到 `localhost:28789`（SSH 隧道映射过来的手机 Gateway）。
 
 ---
 
@@ -133,12 +133,12 @@ SILICONFLOW_API_KEY=sk-xxx
     },
   },
   gateway: {
-    mode: "local", port: 18789, bind: "lan",
+    mode: "local", port: 28789, bind: "lan",
     controlUi: {
       enabled: true,
       allowInsecureAuth: true,
       dangerouslyDisableDeviceAuth: true,
-      allowedOrigins: ["http://114.55.130.197:18790"],
+      allowedOrigins: ["http://114.55.130.197:28790"],
     },
     trustedProxies: ["127.0.0.1"],
     auth: { mode: "token", token: "${OPENCLAW_GATEWAY_TOKEN}" },
@@ -168,12 +168,12 @@ set -a; . $HOME/.openclaw/.env; set +a
 termux-wake-lock           # 防止后台被杀
 
 pkill -f "openclaw" 2>/dev/null
-pkill -f "ssh.*18789" 2>/dev/null
+pkill -f "ssh.*28789" 2>/dev/null
 tmux kill-session -t clawbot 2>/dev/null
 sleep 2
 
 # 窗口1: Gateway
-tmux new-session -d -s clawbot -n gw "export HOME=$HOME PREFIX=$PREFIX PATH=$PATH TMPDIR=$TMPDIR TMP=$TMPDIR TEMP=$TMPDIR OPENCLAW_GATEWAY_TOKEN=$OPENCLAW_GATEWAY_TOKEN DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY SILICONFLOW_API_KEY=$SILICONFLOW_API_KEY; openclaw gateway --port 18789 --verbose 2>&1 | tee $PREFIX/tmp/openclaw/gateway-stdout.log"
+tmux new-session -d -s clawbot -n gw "export HOME=$HOME PREFIX=$PREFIX PATH=$PATH TMPDIR=$TMPDIR TMP=$TMPDIR TEMP=$TMPDIR OPENCLAW_GATEWAY_TOKEN=$OPENCLAW_GATEWAY_TOKEN DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY SILICONFLOW_API_KEY=$SILICONFLOW_API_KEY; openclaw gateway --port 28789 --verbose 2>&1 | tee $PREFIX/tmp/openclaw/gateway-stdout.log"
 
 sleep 12
 
@@ -193,7 +193,7 @@ while true; do
   echo "$(date): Starting SSH tunnel..."
   ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
       -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no \
-      -R 18789:127.0.0.1:18789 root@114.55.130.197 -N
+      -R 28789:127.0.0.1:28789 root@114.55.130.197 -N
   echo "$(date): Tunnel died (exit=$?). Restarting in 5s..."
   sleep 5
 done
