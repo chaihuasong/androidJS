@@ -4,25 +4,25 @@
 
 ```
 用户浏览器                    云服务器 114.55.130.197              Android 手机 (Termux)
-┌──────────┐                ┌─────────────────────┐            ┌──────────────────────────┐
-│ Web UI   │── HTTP/WS ──→ │  Nginx (:28790)      │            │  OpenClaw Gateway (:28789)│
-│ 聊天界面  │               │  反向代理             │◄─SSH隧道──│  (Node.js)               │
-└──────────┘                │  proxy_pass :28789   │  R 28789   │       ↓                  │
-                            └─────────────────────┘            │  DeepSeek Chat (AI 模型)  │
-                                                               │       ↓                  │
-                                                               │  exec 工具 → bash         │
-                                                               │       ↓                  │
-                                                               │  Termux:API 命令          │
-                                                               │  ┌──────────────────────┐│
-                                                               │  │ termux-torch (手电筒) ││
-                                                               │  │ termux-vibrate (振动) ││
-                                                               │  │ termux-tts-speak(语音)││
-                                                               │  │ termux-location(定位) ││
-                                                               │  │ termux-telephony(电话)││
-                                                               │  │ termux-sensor (传感器)││
-                                                               │  │ ...共 16 项功能       ││
-                                                               │  └──────────────────────┘│
-                                                               └──────────────────────────┘
+┌──────────┐                ┌─────────────────────┐            ┌───────────────────────────┐
+│ Web UI   │── HTTP/WS ──→  │  Nginx (:28790)     │            │  OpenClaw Gateway (:28789)│
+│ 聊天界面  │                │  反向代理             │◄─SSH隧道── │  (Node.js)                │
+└──────────┘                │  proxy_pass :28789  │  R 28789   │       ↓                   │
+                            └─────────────────────┘            │  DeepSeek Chat (AI 模型)   │
+                                                               │       ↓                   │
+                                                               │  exec 工具 → bash          │
+                                                               │       ↓                   │
+                                                               │  Termux:API 命令           │
+                                                               │  ┌──────────────────────┐ │
+                                                               │  │ termux-torch (手电筒) │ │
+                                                               │  │ termux-vibrate (振动) │ │
+                                                               │  │ termux-tts-speak(语音)│ │
+                                                               │  │ termux-location(定位) │ │
+                                                               │  │ termux-telephony(电话)│ │
+                                                               │  │ termux-sensor (传感器)│ │
+                                                               │  │ ...共 16 项功能       │ │
+                                                               │  └──────────────────────┘ │
+                                                               └───────────────────────────┘
 ```
 
 **核心原理：零代码，纯配置 + Skill 提示词**
