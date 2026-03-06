@@ -29,12 +29,12 @@ You can control phone hardware by executing termux-api commands via the exec/bas
 
 **Take a photo (rear camera):**
 ```bash
-timeout 10 termux-camera-photo -c 0 /tmp/clawbot-photo.jpg && ls -la /tmp/clawbot-photo.jpg
+timeout 10 termux-camera-photo -c 0 $TMPDIR/clawbot-photo.jpg && ls -la $TMPDIR/clawbot-photo.jpg
 ```
 
 **Take a photo (front camera):**
 ```bash
-timeout 10 termux-camera-photo -c 1 /tmp/clawbot-photo.jpg && ls -la /tmp/clawbot-photo.jpg
+timeout 10 termux-camera-photo -c 1 $TMPDIR/clawbot-photo.jpg && ls -la $TMPDIR/clawbot-photo.jpg
 ```
 
 **List available cameras:**

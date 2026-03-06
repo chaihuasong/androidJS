@@ -27,30 +27,30 @@ Phone (photo) → SCP → Cloud Server /var/www/clawbot-photos/ → Nginx /photo
 
 **Take a new photo (rear camera):**
 ```bash
-mkdir -p /tmp/clawbot-photos
+mkdir -p $TMPDIR/clawbot-photos
 PHOTO_NAME="photo-$(date +%Y%m%d-%H%M%S).jpg"
-timeout 10 termux-camera-photo -c 0 /tmp/clawbot-photos/$PHOTO_NAME
-ls -la /tmp/clawbot-photos/$PHOTO_NAME
+timeout 10 termux-camera-photo -c 0 $TMPDIR/clawbot-photos/$PHOTO_NAME
+ls -la $TMPDIR/clawbot-photos/$PHOTO_NAME
 ```
 
 **Take a new photo (front camera):**
 ```bash
-mkdir -p /tmp/clawbot-photos
+mkdir -p $TMPDIR/clawbot-photos
 PHOTO_NAME="photo-$(date +%Y%m%d-%H%M%S).jpg"
-timeout 10 termux-camera-photo -c 1 /tmp/clawbot-photos/$PHOTO_NAME
-ls -la /tmp/clawbot-photos/$PHOTO_NAME
+timeout 10 termux-camera-photo -c 1 $TMPDIR/clawbot-photos/$PHOTO_NAME
+ls -la $TMPDIR/clawbot-photos/$PHOTO_NAME
 ```
 
 **Use an existing image file:**
 ```bash
 PHOTO_NAME="photo-$(date +%Y%m%d-%H%M%S).jpg"
-cp /path/to/existing/image.jpg /tmp/clawbot-photos/$PHOTO_NAME
+cp /path/to/existing/image.jpg $TMPDIR/clawbot-photos/$PHOTO_NAME
 ```
 
 ### 2. Upload to cloud server
 
 ```bash
-scp -o StrictHostKeyChecking=no /tmp/clawbot-photos/$PHOTO_NAME root@114.55.130.197:/var/www/clawbot-photos/$PHOTO_NAME \
+scp -o StrictHostKeyChecking=no $TMPDIR/clawbot-photos/$PHOTO_NAME root@114.55.130.197:/var/www/clawbot-photos/$PHOTO_NAME \
   && ssh -o StrictHostKeyChecking=no root@114.55.130.197 "chmod 644 /var/www/clawbot-photos/$PHOTO_NAME"
 ```
 
@@ -67,10 +67,10 @@ Replace `PHOTO_NAME` with the actual filename (e.g., `photo-20260228-153000.jpg`
 ## Complete Example (one-shot)
 
 ```bash
-mkdir -p /tmp/clawbot-photos
+mkdir -p $TMPDIR/clawbot-photos
 PHOTO_NAME="photo-$(date +%Y%m%d-%H%M%S).jpg"
-timeout 10 termux-camera-photo -c 0 /tmp/clawbot-photos/$PHOTO_NAME \
-  && scp -o StrictHostKeyChecking=no /tmp/clawbot-photos/$PHOTO_NAME root@114.55.130.197:/var/www/clawbot-photos/$PHOTO_NAME \
+timeout 10 termux-camera-photo -c 0 $TMPDIR/clawbot-photos/$PHOTO_NAME \
+  && scp -o StrictHostKeyChecking=no $TMPDIR/clawbot-photos/$PHOTO_NAME root@114.55.130.197:/var/www/clawbot-photos/$PHOTO_NAME \
   && ssh -o StrictHostKeyChecking=no root@114.55.130.197 "chmod 644 /var/www/clawbot-photos/$PHOTO_NAME" \
   && echo "![photo](http://114.55.130.197:28790/photos/$PHOTO_NAME)"
 ```
@@ -81,6 +81,6 @@ timeout 10 termux-camera-photo -c 0 /tmp/clawbot-photos/$PHOTO_NAME \
 - Always verify the photo file exists and has non-zero size before uploading.
 - If `termux-camera-photo` fails, suggest the user check camera permissions.
 - If `scp` fails, check SSH connectivity to the cloud server.
-- Clean up old photos periodically: `rm /tmp/clawbot-photos/photo-*.jpg`
+- Clean up old photos periodically: `rm $TMPDIR/clawbot-photos/photo-*.jpg`
 - The cloud server directory is `/var/www/clawbot-photos/`, served at `http://114.55.130.197:28790/photos/`.
 - After outputting the Markdown image link, the chat UI will render it as an inline image.

@@ -18,7 +18,7 @@ Capture the phone screen via `screencap` and upload to the cloud server for disp
 ## How It Works
 
 ```
-screencap → /tmp/screenshot.png → SCP → Cloud /var/www/clawbot-photos/ → Browser
+screencap → $TMPDIR/screenshot.png → SCP → Cloud /var/www/clawbot-photos/ → Browser
 ```
 
 `screencap` is a built-in Android tool — no Termux:API or extra permissions needed.
@@ -30,7 +30,7 @@ CLOUD="root@114.55.130.197"
 PHOTO_DIR="/var/www/clawbot-photos"
 BASE_URL="http://114.55.130.197:28790/photos"
 SS_NAME="screenshot-$(date +%Y%m%d-%H%M%S).png"
-SS_PATH="/tmp/$SS_NAME"
+SS_PATH="$TMPDIR/$SS_NAME"
 
 screencap -p "$SS_PATH" \
   && echo "Captured: $(du -sh $SS_PATH | cut -f1)" \
@@ -51,7 +51,7 @@ BASE_URL="http://114.55.130.197:28790/photos"
 for i in 1 2 3; do
   sleep 2
   SS_NAME="screenshot-$(date +%Y%m%d-%H%M%S)-${i}.png"
-  SS_PATH="/tmp/$SS_NAME"
+  SS_PATH="$TMPDIR/$SS_NAME"
   screencap -p "$SS_PATH" \
     && scp -o StrictHostKeyChecking=no "$SS_PATH" "$CLOUD:$PHOTO_DIR/$SS_NAME" \
     && ssh -o StrictHostKeyChecking=no "$CLOUD" "chmod 644 $PHOTO_DIR/$SS_NAME" \

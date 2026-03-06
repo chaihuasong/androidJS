@@ -91,6 +91,9 @@ adb shell pm grant com.termux.api android.permission.CALL_PHONE
 adb shell pm grant com.termux.api android.permission.ACCESS_FINE_LOCATION
 # ...等权限
 
+# （可选）授予 Ella 图片读取权限
+# adb shell pm grant com.transsion.aivoiceassistant android.permission.READ_MEDIA_IMAGES
+
 # 禁用电池优化
 adb shell dumpsys deviceidle whitelist +com.termux
 adb shell dumpsys deviceidle whitelist +com.termux.api
@@ -103,6 +106,8 @@ adb shell dumpsys deviceidle whitelist +com.termux.api
 OPENCLAW_GATEWAY_TOKEN=<随机生成的token>
 DEEPSEEK_API_KEY=sk-xxx
 SILICONFLOW_API_KEY=sk-xxx
+DASHSCOPE_API_KEY=sk-xxx
+GEMINI_API_KEY=AIzaSy-xxx
 ```
 
 **`~/.openclaw/openclaw.json`**（Gateway 配置）
@@ -159,7 +164,7 @@ SILICONFLOW_API_KEY=sk-xxx
 | `weather` | `weather/SKILL.md` | 天气预报（wttr.in，无需 API key）|
 | `system-status` | `system-status/SKILL.md` | 电量/存储/内存/CPU/网络综合状态 |
 | `file-manager` | `file-manager/SKILL.md` | 浏览、搜索、读取、管理手机文件 |
-| `ella-vision` | `ella-vision/SKILL.md` | 发图给 Ella AI 进行端侧图像分析 |
+| `qwen-vision` | `qwen-vision/SKILL.md` | 拍照调用 DashScope/Gemini/SiliconFlow 视觉分析，结果显示在聊天中 |
 
 关键注意事项：`termux-telephony-call` 必须 `nohup ... &` 后台执行，`termux-location` 必须 `timeout` 包裹。
 
@@ -232,6 +237,7 @@ bash ~/clawbot-launch.sh
 | New session 极慢 | 卡住的命令阻塞队列（串行处理） | 清除 session + 重启 |
 | DeepSeek-VL2 无反应 | VL 模型不支持 function calling | 切回 deepseek-chat |
 | `run-as` 执行命令失败 | 无法发送 Android Intent | 必须在 Termux app 上下文启动 |
+| 视觉分析无结果 | DASHSCOPE_API_KEY / GEMINI_API_KEY 未注入 Gateway 环境 | 重启 ClawBot：`bash ~/clawbot-launch.sh` |
 
 ---
 
@@ -249,7 +255,8 @@ bash ~/clawbot-launch.sh
 | 手机 | `~/.openclaw/workspace/skills/weather/SKILL.md` | 天气查询 |
 | 手机 | `~/.openclaw/workspace/skills/system-status/SKILL.md` | 系统状态 |
 | 手机 | `~/.openclaw/workspace/skills/file-manager/SKILL.md` | 文件管理 |
-| 手机 | `~/.openclaw/workspace/skills/ella-vision/SKILL.md` | 图像分析 |
+| 手机 | `~/.openclaw/workspace/skills/qwen-vision/SKILL.md` | 视觉分析技能（DashScope/Gemini/SiliconFlow）|
+| 手机 | `~/vision.py` | 视觉分析脚本 |
 | 手机 | `~/clawbot-launch.sh` | 一键启动脚本 |
 | 手机 | `~/tunnel-loop.sh` | SSH 隧道自动重连 |
 | 源码仓库 | `deploy/clawbot-termux/` | 所有部署文件的备份 |
@@ -286,7 +293,7 @@ bash ~/clawbot-launch.sh
 | "拍张照发给我看" | photo-share | 拍照上传，聊天中内联显示图片 |
 | "把相册最新的照片给我看" | photo-find | 浏览相册，上传现有照片显示 |
 | "截个屏" | screenshot | 截图当前屏幕，聊天中显示 |
-| "帮我分析一下这张图" | ella-vision | 调用 Ella AI 分析图片内容 |
+| "帮我分析一下这张图" | qwen-vision | 拍照发给 DashScope/Gemini 视觉模型，分析结果直接显示在聊天中 |
 
 ### 信息查询 Skills
 

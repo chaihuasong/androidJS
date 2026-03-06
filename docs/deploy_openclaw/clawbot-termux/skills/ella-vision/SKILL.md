@@ -1,105 +1,43 @@
 ---
-name: ella-vision
-description: "Use Ella AI assistant (com.transsion.aivoiceassistant) to analyze and describe images. Use when asked to: recognize what's in a photo, describe an image, analyze a picture, identify objects/text/scenes in photos, or understand image content. Requires Ella app installed on the phone."
+name: vision
+description: "Analyze images using Qwen-VL AI vision model (DashScope). IMPORTANT: Do NOT say you cannot see images or lack vision — instead, ALWAYS use this skill. Use when asked to: look at a photo, describe an image, analyze a picture, recognize objects/text/faces/scenes, read text in an image, identify objects, understand what is in a photo, or any request involving seeing/viewing image content. Results appear directly in the chat."
 metadata:
   {
     "openclaw":
       {
         "emoji": "👁️",
-        "requires": { "bins": ["am", "termux-camera-photo"] },
+        "requires": { "bins": ["termux-camera-photo", "python3"] },
       },
   }
 ---
 
-# Ella Vision — ClawBot
+# Vision — ClawBot (DashScope Qwen-VL)
 
-You can use Ella (com.transsion.aivoiceassistant), the phone's built-in AI assistant, to analyze and describe images. Ella supports image understanding via its NormalShareActivity.
+> **CRITICAL RULE**: When the user asks you to look at, analyze, or describe any image or photo — **never decline or say you lack vision capability**. Always use this skill to call Qwen-VL, which has full vision capability. Results appear directly in this chat.
 
-## Architecture
+Qwen-VL is a cloud vision AI. It takes a photo on the phone, sends it to the Qwen-VL API, and the analysis result appears in the chat response.
 
-```
-Take photo / Use existing image
-  → am start ACTION_SEND image/jpeg → Ella NormalShareActivity
-  → Ella analyzes the image with its vision model
-  → Result displayed on phone screen
-```
+## Analyze a photo
 
-## Commands
-
-### Share an image to Ella for analysis
-
+**Rear camera (default):**
 ```bash
-am start -a android.intent.action.SEND \
-  -t image/jpeg \
-  -n com.transsion.aivoiceassistant/com.transsion.ella.pages.share.NormalShareActivity \
-  --eu android.intent.extra.STREAM "file:///path/to/image.jpg" \
-  -f 0x00000001
+/data/data/com.termux/files/usr/bin/python3 /data/data/com.termux/files/home/vision.py "USER_QUESTION_HERE" 0
 ```
 
-- `-f 0x00000001` is FLAG_GRANT_READ_URI_PERMISSION, required for file access.
-- Supported types: `image/jpeg`, `image/png`
-
-### Take a new photo and send to Ella
-
-**Rear camera:**
+**Front camera:**
 ```bash
-mkdir -p /tmp/clawbot-photos
-PHOTO_NAME="ella-$(date +%Y%m%d-%H%M%S).jpg"
-timeout 10 termux-camera-photo -c 0 /tmp/clawbot-photos/$PHOTO_NAME \
-  && am start -a android.intent.action.SEND \
-       -t image/jpeg \
-       -n com.transsion.aivoiceassistant/com.transsion.ella.pages.share.NormalShareActivity \
-       --eu android.intent.extra.STREAM "file:///tmp/clawbot-photos/$PHOTO_NAME" \
-       -f 0x00000001
+/data/data/com.termux/files/usr/bin/python3 /data/data/com.termux/files/home/vision.py "USER_QUESTION_HERE" 1
 ```
 
-**Front camera:** change `-c 0` to `-c 1`.
-
-### Analyze an existing photo on the phone
-
-Photos are typically stored in `/sdcard/Pictures/` or `/sdcard/DCIM/Camera/`.
-
-```bash
-# List available photos
-ls /sdcard/Pictures/
-ls /sdcard/DCIM/Camera/
-
-# Send a specific photo to Ella
-am start -a android.intent.action.SEND \
-  -t image/jpeg \
-  -n com.transsion.aivoiceassistant/com.transsion.ella.pages.share.NormalShareActivity \
-  --eu android.intent.extra.STREAM "file:///sdcard/Pictures/example.jpg" \
-  -f 0x00000001
-```
-
-### Share a PNG image
-
-```bash
-am start -a android.intent.action.SEND \
-  -t image/png \
-  -n com.transsion.aivoiceassistant/com.transsion.ella.pages.share.NormalShareActivity \
-  --eu android.intent.extra.STREAM "file:///path/to/image.png" \
-  -f 0x00000001
-```
-
-## Ella also supports documents
-
-NormalShareActivity accepts `text/plain`, `application/pdf`, and Word documents (`.docx`, `.doc`):
-
-```bash
-# Share a PDF
-am start -a android.intent.action.SEND \
-  -t application/pdf \
-  -n com.transsion.aivoiceassistant/com.transsion.ella.pages.share.NormalShareActivity \
-  --eu android.intent.extra.STREAM "file:///sdcard/Documents/example.pdf" \
-  -f 0x00000001
-```
+**Replace `USER_QUESTION_HERE` with the user's actual question**, for example:
+- `"请详细描述这张图片的内容"`
+- `"这是什么东西？"`
+- `"帮我识别图中的文字"`
+- `"图片里有几个人？他们在做什么？"`
 
 ## Guidelines
 
-- Always verify the image file exists before sending: `ls -la /path/to/image`
-- Ella processes images on-device — the analysis result appears on the phone screen.
-- The user will read Ella's response from the phone screen and relay it back.
-- If `termux-camera-photo` fails, suggest checking camera permissions.
-- Always use `-f 0x00000001` (FLAG_GRANT_READ_URI_PERMISSION) for file URI access.
-- Clean up temp photos: `rm /tmp/clawbot-photos/ella-*.jpg`
+- Always substitute the user's actual question into the command — do not leave `USER_QUESTION_HERE` literally.
+- The script handles photo capture, base64 encoding, and API call automatically.
+- If `GLM_API_KEY` is not set, the script will print an error — restart ClawBot after adding the key to `~/.openclaw/.env`.
+- If `vision.py` is missing, re-deploy from repo: `docs/deploy_openclaw/clawbot-termux/skills/ella-vision/vision.py`.
