@@ -148,9 +148,20 @@ SILICONFLOW_API_KEY=sk-xxx
 }
 ```
 
-**`~/.openclaw/workspace/skills/phone-control/SKILL.md`**（Skill 提示词）
-- 教 Agent 所有 16 个 termux-api 命令的用法
-- 关键注意事项：`termux-telephony-call` 必须 `nohup ... &` 后台执行，`termux-location` 必须 `timeout` 包裹
+**Skills（`~/.openclaw/workspace/skills/`）**
+
+| Skill | 文件 | 功能 |
+|-------|------|------|
+| `phone-control` | `phone-control/SKILL.md` | 16 项 termux-api 硬件控制 |
+| `photo-share` | `photo-share/SKILL.md` | 拍照并上传至云端在聊天中显示 |
+| `photo-find` | `photo-find/SKILL.md` | 浏览相册、按日期筛选、上传现有照片 |
+| `screenshot` | `screenshot/SKILL.md` | 截屏并在聊天中内联显示 |
+| `weather` | `weather/SKILL.md` | 天气预报（wttr.in，无需 API key）|
+| `system-status` | `system-status/SKILL.md` | 电量/存储/内存/CPU/网络综合状态 |
+| `file-manager` | `file-manager/SKILL.md` | 浏览、搜索、读取、管理手机文件 |
+| `ella-vision` | `ella-vision/SKILL.md` | 发图给 Ella AI 进行端侧图像分析 |
+
+关键注意事项：`termux-telephony-call` 必须 `nohup ... &` 后台执行，`termux-location` 必须 `timeout` 包裹。
 
 ### 2.3 启动脚本
 
@@ -191,8 +202,9 @@ export HOME=/data/data/com.termux/files/home
 export PATH=/data/data/com.termux/files/usr/bin:$PATH
 while true; do
   echo "$(date): Starting SSH tunnel..."
-  ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+  ssh -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
       -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no \
+      -o ConnectTimeout=5 \
       -R 28789:127.0.0.1:28789 root@114.55.130.197 -N
   echo "$(date): Tunnel died (exit=$?). Restarting in 5s..."
   sleep 5
@@ -230,14 +242,23 @@ bash ~/clawbot-launch.sh
 | 云服务器 | `/etc/nginx/conf.d/clawbot.conf` | Nginx 反向代理 |
 | 手机 | `~/.openclaw/openclaw.json` | Gateway + 模型 + 认证配置 |
 | 手机 | `~/.openclaw/.env` | API Keys |
-| 手机 | `~/.openclaw/workspace/skills/phone-control/SKILL.md` | 16 项手机控制指令的 Skill |
+| 手机 | `~/.openclaw/workspace/skills/phone-control/SKILL.md` | 16 项硬件控制 |
+| 手机 | `~/.openclaw/workspace/skills/photo-share/SKILL.md` | 拍照显示 |
+| 手机 | `~/.openclaw/workspace/skills/photo-find/SKILL.md` | 浏览相册 |
+| 手机 | `~/.openclaw/workspace/skills/screenshot/SKILL.md` | 截图显示 |
+| 手机 | `~/.openclaw/workspace/skills/weather/SKILL.md` | 天气查询 |
+| 手机 | `~/.openclaw/workspace/skills/system-status/SKILL.md` | 系统状态 |
+| 手机 | `~/.openclaw/workspace/skills/file-manager/SKILL.md` | 文件管理 |
+| 手机 | `~/.openclaw/workspace/skills/ella-vision/SKILL.md` | 图像分析 |
 | 手机 | `~/clawbot-launch.sh` | 一键启动脚本 |
 | 手机 | `~/tunnel-loop.sh` | SSH 隧道自动重连 |
 | 源码仓库 | `deploy/clawbot-termux/` | 所有部署文件的备份 |
 
 ---
 
-## 五、可演示功能（16 项）
+## 五、可演示功能
+
+### phone-control（16 项硬件控制）
 
 | # | 功能 | 指令示例 | 效果 |
 |---|------|---------|------|
@@ -257,5 +278,22 @@ bash ~/clawbot-launch.sh
 | 14 | Wi-Fi | "查看当前 Wi-Fi" | 返回网络信息 |
 | 15 | 通讯录 | "列出联系人" | 读取通讯录 |
 | 16 | 设备信息 | "查看手机信息" | SIM 卡、运营商 |
+
+### 图像类 Skills
+
+| 指令示例 | Skill | 效果 |
+|---------|-------|------|
+| "拍张照发给我看" | photo-share | 拍照上传，聊天中内联显示图片 |
+| "把相册最新的照片给我看" | photo-find | 浏览相册，上传现有照片显示 |
+| "截个屏" | screenshot | 截图当前屏幕，聊天中显示 |
+| "帮我分析一下这张图" | ella-vision | 调用 Ella AI 分析图片内容 |
+
+### 信息查询 Skills
+
+| 指令示例 | Skill | 效果 |
+|---------|-------|------|
+| "今天天气怎么样" | weather | 当前天气 + 3 天预报 |
+| "手机还剩多少存储" | system-status | 电量/存储/内存/CPU 综合报告 |
+| "帮我看看 Download 文件夹里有什么" | file-manager | 列出并管理手机文件 |
 
 **零行自定义代码**，全部通过 OpenClaw 配置 + SKILL.md 提示词实现 AI 控制手机。

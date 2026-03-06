@@ -1,7 +1,7 @@
 # ClawBot — Termux Local Mode + Cloud Remote Access
 
 Control your Android phone via AI through OpenClaw running in Termux.
-Supports: flashlight, camera + image description, sensors, phone calls.
+Supports: flashlight, camera, screenshots, weather, sensors, phone calls, file management and more.
 
 ## Architecture
 
@@ -65,15 +65,32 @@ This starts the Gateway and SSH tunnel in a tmux session.
 - **Local (same Wi-Fi):** `http://<phone-ip>:28789`
 - **Remote (anywhere):** `http://114.55.130.197:28790`
 
+## Skills
+
+| Skill | Description |
+|-------|-------------|
+| `phone-control` | Flashlight, camera, sensors, calls, SMS, TTS, GPS, clipboard, Wi-Fi |
+| `photo-share` | Take a new photo and display it inline in chat |
+| `photo-find` | Browse camera roll, filter by date, upload existing photos to chat |
+| `screenshot` | Capture the phone screen and display it inline in chat |
+| `weather` | Current weather and 3-day forecast via wttr.in (no API key needed) |
+| `system-status` | Battery, storage, memory, CPU, and network overview |
+| `file-manager` | Browse, search, read, copy, move and delete files on the phone |
+| `ella-vision` | Send a photo to Ella AI for on-device image analysis |
+
 ## Demo Commands
 
-| Say this | Agent does | Result |
-|----------|-----------|--------|
-| "Turn on the flashlight" | `termux-torch on` | Phone LED on |
-| "Turn off the flashlight" | `termux-torch off` | Phone LED off |
-| "Take a photo" | `termux-camera-photo` + `base64` | AI describes scene |
-| "Read the accelerometer" | `termux-sensor -s accelerometer -n 1` | Shows XYZ values |
-| "Call 10086" | `termux-telephony-call 10086` | Phone dials number |
+| Say this | Skill | Result |
+|----------|-------|--------|
+| "Turn on the flashlight" | phone-control | Phone LED on |
+| "Take a photo and show me" | photo-share | Inline photo in chat |
+| "Show me the latest photo from my camera roll" | photo-find | Uploads and displays existing photo |
+| "Take a screenshot" | screenshot | Inline screenshot in chat |
+| "What's the weather today?" | weather | Current weather + forecast |
+| "How much storage is left?" | system-status | Disk/battery/memory report |
+| "List my recent downloads" | file-manager | Files in /sdcard/Download/ |
+| "Read the accelerometer" | phone-control | Shows XYZ sensor values |
+| "Call 10086" | phone-control | Phone dials number |
 
 ## File Layout
 
@@ -82,8 +99,14 @@ clawbot-termux/
 ├── README.md                          # This file
 ├── openclaw.json                      # Gateway config → ~/.openclaw/
 ├── skills/
-│   └── phone-control/
-│       └── SKILL.md                   # Phone control skill → ~/.openclaw/workspace/skills/
+│   ├── phone-control/SKILL.md         # Hardware control (torch/camera/sensor/call/SMS)
+│   ├── photo-share/SKILL.md           # Take photo and display in chat
+│   ├── photo-find/SKILL.md            # Browse and upload existing photos
+│   ├── screenshot/SKILL.md            # Capture screen and display in chat
+│   ├── weather/SKILL.md               # Weather forecast via wttr.in
+│   ├── system-status/SKILL.md         # Battery/storage/memory/CPU overview
+│   ├── file-manager/SKILL.md          # Browse/search/manage phone files
+│   └── ella-vision/SKILL.md           # On-device image analysis via Ella AI
 ├── scripts/
 │   ├── termux-setup.sh                # One-time setup script
 │   └── clawbot-start.sh              # Start gateway + tunnel
@@ -97,6 +120,6 @@ clawbot-termux/
 |-------|-----|
 | `termux-torch: not found` | Install Termux:API: `pkg install termux-api` |
 | Permission denied | Grant permissions in Android Settings → Apps → Termux:API |
-| SSH tunnel drops | The start script uses `ServerAliveInterval=60` to keep alive |
+| SSH tunnel drops | The start script uses `ServerAliveInterval=5` to keep alive |
 | Gateway won't start | Check `~/.openclaw/openclaw.log` and ensure port 28789 is free |
 | Can't reach from cloud | Verify tunnel: `ssh root@114.55.130.197 'curl -s localhost:28789/health'` |
