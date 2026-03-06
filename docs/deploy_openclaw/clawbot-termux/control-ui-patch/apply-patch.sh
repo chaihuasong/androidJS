@@ -18,14 +18,14 @@ adb shell "run-as com.termux sh -c '
   DEST=${DEST}
   # 如果还没注入过，则在 <script type=\"module\" 前插入
   if ! grep -q patch.js \$DEST/index.html; then
-    sed -i \"s|<script type=\\\"module\\\"|<script src=\\\"./patch.js?v=10\\\"></script>\\n    <script type=\\\"module\\\"|\" \$DEST/index.html
+    sed -i \"s|<script type=\\\"module\\\"|<script src=\\\"./patch.js?v=11\\\"></script>\\n    <script type=\\\"module\\\"|\" \$DEST/index.html
     echo patched
   else
     # 更新版本号
-    sed -i \"s|patch.js?v=[0-9]*|patch.js?v=10|\" \$DEST/index.html
+    sed -i \"s|patch.js?v=[0-9]*|patch.js?v=11|\" \$DEST/index.html
     echo updated
   fi
 '"
 
 echo "完成！在浏览器中刷新页面（F5）后生效。"
-echo "Console 里看到 [clawbot-patch] v10 loaded 即表示成功。"
+echo "Console 里看到 [clawbot-patch] v11 loaded 即表示成功。"

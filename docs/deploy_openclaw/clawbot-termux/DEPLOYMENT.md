@@ -284,6 +284,7 @@ openclaw 原生 Control UI 不会自动刷新，需手动点右上角刷新按�
 - Agent 开始运行 → 每 5 秒自动点刷新按钮
 - Tool 调用（`tool_start` / `tool_end`）→ 立即点刷新
 - Agent 运行结束 → 停止定时器，再点一次收尾
+- 界面出现 "refresh recommended" 提示 → 延迟 200ms 自动点刷新
 
 **部署（换机或 openclaw 更新后需重新执行）：**
 
@@ -300,10 +301,10 @@ DEST="/data/data/com.termux/files/usr/lib/node_modules/openclaw/dist/control-ui"
 base64 -i control-ui-patch/patch.js | adb shell "run-as com.termux sh -c 'base64 -d > ${DEST}/patch.js'"
 
 # 在 index.html 中注入引用（只需执行一次）
-adb shell "run-as com.termux sed -i 's|<script type=\"module\"|<script src=\"./patch.js?v=10\"></script>\n    <script type=\"module\"|' ${DEST}/index.html"
+adb shell "run-as com.termux sed -i 's|<script type=\"module\"|<script src=\"./patch.js?v=11\"></script>\n    <script type=\"module\"|' ${DEST}/index.html"
 ```
 
-**验证：** 浏览器刷新后，Console 出现 `[clawbot-patch] v10 loaded`，标签页标题变为 `OpenClaw Control [P7]`。
+**验证：** 浏览器刷新后，Console 出现 `[clawbot-patch] v11 loaded`，标签页标题变为 `OpenClaw Control [P7]`。
 
 > **注意：** openclaw 升级后 `index.html` 会被覆盖，需重新执行 `apply-patch.sh`。
 
