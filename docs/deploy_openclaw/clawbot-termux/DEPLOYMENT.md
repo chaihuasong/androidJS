@@ -97,6 +97,10 @@ adb shell pm grant com.termux.api android.permission.ACCESS_FINE_LOCATION
 # 禁用电池优化
 adb shell dumpsys deviceidle whitelist +com.termux
 adb shell dumpsys deviceidle whitelist +com.termux.api
+
+# 禁用 Android 12+ Phantom Process Killer（每次重启手机后需重新执行）
+# Android 12+ 会每5分钟清理 App 的子进程（openclaw-gateway 会被杀掉导致502）
+adb shell device_config put activity_manager max_phantom_processes 2147483647
 ```
 
 ### 2.2 配置文件
@@ -206,13 +210,15 @@ echo "ClawBot started. Tunnel will auto-reconnect if dropped."
 export HOME=/data/data/com.termux/files/home
 export PATH=/data/data/com.termux/files/usr/bin:$PATH
 while true; do
+  # 清理服务器上可能僵尸占着端口的旧 sshd（否则 ExitOnForwardFailure 会立即退出）
+  ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@114.55.130.197 "fuser -k 28789/tcp 2>/dev/null; true" 2>/dev/null || true
   echo "$(date): Starting SSH tunnel..."
   ssh -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
       -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no \
-      -o ConnectTimeout=5 \
+      -o TCPKeepAlive=yes -o ConnectTimeout=10 \
       -R 28789:127.0.0.1:28789 root@114.55.130.197 -N
-  echo "$(date): Tunnel died (exit=$?). Restarting in 5s..."
-  sleep 5
+  echo "$(date): Tunnel died (exit=$?). Restarting in 3s..."
+  sleep 3
 done
 ```
 
@@ -238,6 +244,10 @@ bash ~/clawbot-launch.sh
 | DeepSeek-VL2 无反应 | VL 模型不支持 function calling | 切回 deepseek-chat |
 | `run-as` 执行命令失败 | 无法发送 Android Intent | 必须在 Termux app 上下文启动 |
 | 视觉分析无结果 | DASHSCOPE_API_KEY / GEMINI_API_KEY 未注入 Gateway 环境 | 重启 ClawBot：`bash ~/clawbot-launch.sh` |
+| openclaw 每5分钟被杀 | Android 12+ Phantom Process Killer 清理子进程 | `adb shell device_config put activity_manager max_phantom_processes 2147483647`（重启手机后失效，需重新执行）|
+| 502 Bad Gateway（隧道起不来）| 服务器旧 sshd 进程僵尸占着端口 28789 | `ssh root@服务器 "fuser -k 28789/tcp"` 清理后隧道自动重连 |
+| Tool 调用过程看不到 / 消息不刷新 | Control UI 不自动刷新，需手动点右上角刷新按钮 | 部署 `control-ui-patch/patch.js`（见下方章节），agent 运行期间每5秒自动点刷新 |
+| Agent session 卡死不回复 | DeepSeek 流式请求挂起（`tool_stream:true` 引起）| 将 `tool_stream` 设为 `false`，重启 openclaw |
 
 ---
 
@@ -259,11 +269,47 @@ bash ~/clawbot-launch.sh
 | 手机 | `~/vision.py` | 视觉分析脚本 |
 | 手机 | `~/clawbot-launch.sh` | 一键启动脚本 |
 | 手机 | `~/tunnel-loop.sh` | SSH 隧道自动重连 |
+| 手机 | `<openclaw>/dist/control-ui/patch.js` | Control UI 自动刷新补丁 |
 | 源码仓库 | `deploy/clawbot-termux/` | 所有部署文件的备份 |
+| 源码仓库 | `control-ui-patch/patch.js` | Control UI 补丁源文件 |
+| 源码仓库 | `control-ui-patch/apply-patch.sh` | 一键推送补丁到手机的脚本 |
 
 ---
 
-## 五、可演示功能
+## 五、Control UI 增强补丁
+
+openclaw 原生 Control UI 不会自动刷新，需手动点右上角刷新按钮才能看到 Tool 调用详情和最新消息。`control-ui-patch/patch.js` 通过拦截 WebSocket 事件实现自动刷新。
+
+**功能：**
+- Agent 开始运行 → 每 5 秒自动点刷新按钮
+- Tool 调用（`tool_start` / `tool_end`）→ 立即点刷新
+- Agent 运行结束 → 停止定时器，再点一次收尾
+
+**部署（换机或 openclaw 更新后需重新执行）：**
+
+```bash
+# 在 Mac/PC 上执行（adb 连接手机）
+bash control-ui-patch/apply-patch.sh
+```
+
+或手动推送：
+```bash
+DEST="/data/data/com.termux/files/usr/lib/node_modules/openclaw/dist/control-ui"
+
+# 推送 patch.js
+base64 -i control-ui-patch/patch.js | adb shell "run-as com.termux sh -c 'base64 -d > ${DEST}/patch.js'"
+
+# 在 index.html 中注入引用（只需执行一次）
+adb shell "run-as com.termux sed -i 's|<script type=\"module\"|<script src=\"./patch.js?v=10\"></script>\n    <script type=\"module\"|' ${DEST}/index.html"
+```
+
+**验证：** 浏览器刷新后，Console 出现 `[clawbot-patch] v10 loaded`，标签页标题变为 `OpenClaw Control [P7]`。
+
+> **注意：** openclaw 升级后 `index.html` 会被覆盖，需重新执行 `apply-patch.sh`。
+
+---
+
+## 六、可演示功能
 
 ### phone-control（16 项硬件控制）
 

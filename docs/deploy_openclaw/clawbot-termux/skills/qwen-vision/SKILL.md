@@ -40,3 +40,4 @@ Replace `USER_QUESTION_HERE` with the user's actual question, e.g.:
 - Always substitute the user's actual question — do not leave `USER_QUESTION_HERE` literally.
 - Script handles photo capture, compression, encoding, and API call automatically.
 - Output step-by-step progress is normal — the final result appears after `视觉分析结果`.
+- **必须**将脚本的完整输出原样展示给用户，包括每个步骤和最终分析结果。
