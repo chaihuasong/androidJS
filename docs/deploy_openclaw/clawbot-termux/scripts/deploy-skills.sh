@@ -31,6 +31,7 @@ push_skill() {
 push_skill "xhs-post"
 push_skill "split-open"
 push_skill "ui-control"
+push_skill "screenshot"
 
 echo ""
 echo "完成！已部署："

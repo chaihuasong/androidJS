@@ -29,11 +29,17 @@ screencap → $TMPDIR/screenshot.png → SCP → Cloud /var/www/clawbot-photos/ 
 CLOUD="root@114.55.130.197"
 PHOTO_DIR="/var/www/clawbot-photos"
 BASE_URL="http://114.55.130.197:28790/photos"
-SS_NAME="screenshot-$(date +%Y%m%d-%H%M%S).png"
+TS=$(date +%Y%m%d-%H%M%S)
+RAW="$TMPDIR/ss-$TS.png"
+SS_NAME="screenshot-$TS.jpg"
 SS_PATH="$TMPDIR/$SS_NAME"
 
-screencap -p "$SS_PATH" \
-  && echo "Captured: $(du -sh $SS_PATH | cut -f1)" \
+# 截图
+adb exec-out screencap -p > "$RAW" \
+  && echo "Captured: $(du -sh $RAW | cut -f1)" \
+  && convert "$RAW" -resize 50% -quality 70 "$SS_PATH" \
+  && rm -f "$RAW" \
+  && echo "Compressed: $(du -sh $SS_PATH | cut -f1)" \
   && scp -o StrictHostKeyChecking=no "$SS_PATH" "$CLOUD:$PHOTO_DIR/$SS_NAME" \
   && ssh -o StrictHostKeyChecking=no "$CLOUD" "chmod 644 $PHOTO_DIR/$SS_NAME" \
   && echo "![$SS_NAME]($BASE_URL/$SS_NAME)" \
@@ -43,7 +49,6 @@ screencap -p "$SS_PATH" \
 ## Take Multiple Screenshots with Delay
 
 ```bash
-# Take 3 screenshots 2 seconds apart
 CLOUD="root@114.55.130.197"
 PHOTO_DIR="/var/www/clawbot-photos"
 BASE_URL="http://114.55.130.197:28790/photos"
@@ -52,7 +57,7 @@ for i in 1 2 3; do
   sleep 2
   SS_NAME="screenshot-$(date +%Y%m%d-%H%M%S)-${i}.png"
   SS_PATH="$TMPDIR/$SS_NAME"
-  screencap -p "$SS_PATH" \
+  adb exec-out screencap -p > "$SS_PATH" \
     && scp -o StrictHostKeyChecking=no "$SS_PATH" "$CLOUD:$PHOTO_DIR/$SS_NAME" \
     && ssh -o StrictHostKeyChecking=no "$CLOUD" "chmod 644 $PHOTO_DIR/$SS_NAME" \
     && echo "![$SS_NAME]($BASE_URL/$SS_NAME)" \

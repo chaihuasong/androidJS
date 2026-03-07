@@ -187,6 +187,11 @@ set -a; . $HOME/.openclaw/.env; set +a
 
 termux-wake-lock           # 防止后台被杀
 
+# 连接本机 adb root（ui-control 技能的 uiautomator/input tap 需要）
+# 前提：PC 已执行 after-reboot.sh（含 adb tcpip 5555 + adb root）
+adb connect 127.0.0.1:5555 2>/dev/null || true
+adb root 2>/dev/null || true
+
 pkill -f "openclaw" 2>/dev/null
 pkill -f "ssh.*28789" 2>/dev/null
 tmux kill-session -t clawbot 2>/dev/null
@@ -226,18 +231,53 @@ while true; do
 done
 ```
 
-**`~/watchdog.sh`**（可选：网络活跃探针，防止 USF 判定流量为零）
+**`~/watchdog.sh`**（守护进程：自动重启 gateway/tunnel + TCP 保活）
 ```bash
 #!/data/data/com.termux/files/usr/bin/bash
+# ClawBot Watchdog — auto-restart services
+export HOME=/data/data/com.termux/files/home
+export PREFIX=/data/data/com.termux/files/usr
+export PATH=$PREFIX/bin:$PATH
+export TMPDIR=$PREFIX/tmp
+set -a; . $HOME/.openclaw/.env; set +a
+
+LOG="$TMPDIR/openclaw/watchdog.log"
+
+mkdir -p "$(dirname $LOG)"
+log() { echo "$(date '+%H:%M:%S') $*" | tee -a "$LOG"; }
+log "Watchdog started (pid=$$)"
+
 # 保持少量 TCP 流量，防止 XOS USF Hiber 将 Termux 标记为 speed=0 后冻结
 ( while true; do
     curl -s --max-time 1 http://114.55.130.197:28790/ -o /dev/null 2>/dev/null || true
     sleep 2
   done ) &
 TCP_KEEPALIVE_PID=$!
-echo "TCP keepalive started (pid=$TCP_KEEPALIVE_PID)"
-wait
+
+while true; do
+  # 检查 openclaw gateway
+  if ! pgrep -f "openclaw gateway" > /dev/null 2>&1; then
+    log "OpenClaw not running, restarting..."
+    export OPENCLAW_GATEWAY_TOKEN DEEPSEEK_API_KEY SILICONFLOW_API_KEY GLM_API_KEY DASHSCOPE_API_KEY GEMINI_API_KEY
+    openclaw gateway --port 28789 --verbose >> "$TMPDIR/openclaw/gateway-stdout.log" 2>&1 &
+    sleep 5
+  fi
+
+  # 检查 SSH tunnel
+  if ! pgrep -f "ssh.*28789.*114.55.130.197" > /dev/null 2>&1; then
+    log "SSH tunnel not running, restarting..."
+    ssh \
+      -o ServerAliveInterval=3 -o ServerAliveCountMax=5 \
+      -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no \
+      -o TCPKeepAlive=yes -o ConnectTimeout=10 \
+      -R 28789:127.0.0.1:28789 root@114.55.130.197 -N >> "$LOG" 2>&1 &
+  fi
+
+  sleep 8
+done
 ```
+
+> **注意**：不要在 watchdog 里做 session 文件清理（archive/rename `.jsonl`）。会导致 Control UI 刷新后找不到 session 显示空白。
 
 **`~/diag.sh`**（诊断：实时监控 gateway/隧道/网络状态）
 ```bash

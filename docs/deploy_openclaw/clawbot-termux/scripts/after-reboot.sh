@@ -8,10 +8,14 @@ set -e
 echo "=== ClawBot 重启恢复 ==="
 echo ""
 
-# ── 切换 adb 为 root 模式 ─────────────────────────────────────────────────────
+# ── 切换 adb 为 root 模式 + 开启 TCP ─────────────────────────────────────────
 echo "切换 adb root 模式..."
 adb root
+sleep 1
+# 开启 TCP 端口，让 Termux 内的 adb 客户端可通过 loopback 连接（ui-control 技能需要）
+adb tcpip 5555
 sleep 2
+echo "  adb TCP 5555 已开启"
 echo ""
 
 # ── 1. Phantom Process Killer ────────────────────────────────────────────────

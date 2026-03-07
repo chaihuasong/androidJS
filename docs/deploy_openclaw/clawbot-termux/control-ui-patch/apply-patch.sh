@@ -18,11 +18,11 @@ adb shell "run-as com.termux sh -c '
   DEST=${DEST}
   # 如果还没注入过，则在 <script type=\"module\" 前插入
   if ! grep -q patch.js \$DEST/index.html; then
-    sed -i \"s|<script type=\\\"module\\\"|<script src=\\\"./patch.js?v=11\\\"></script>\\n    <script type=\\\"module\\\"|\" \$DEST/index.html
+    sed -i \"s|<script type=\\\"module\\\"|<script src=\\\"./patch.js?v=13\\\"></script>\\n    <script type=\\\"module\\\"|\" \$DEST/index.html
     echo patched
   else
     # 更新版本号
-    sed -i \"s|patch.js?v=[0-9]*|patch.js?v=11|\" \$DEST/index.html
+    sed -i \"s|patch.js?v=[0-9]*|patch.js?v=13|\" \$DEST/index.html
     echo updated
   fi
 '"

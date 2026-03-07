@@ -1,7 +1,6 @@
 (function() {
-  console.log('[clawbot-patch] v11 loaded');
+  console.log('[clawbot-patch] v13 loaded');
 
-  // ── 1. Click the refresh button (index 8 in current openclaw UI) ───────────
   function clickRefresh() {
     var allBtns = document.querySelectorAll('button, [role="button"]');
     if (allBtns[8]) allBtns[8].click();
@@ -19,8 +18,6 @@
     setTimeout(clickRefresh, 300);
   }
 
-  // ── 2. Intercept WebSocket ─────────────────────────────────────────────────
-  // Format: { type:"event", event:"agent", payload:{ stream:"lifecycle", data:{ phase:"start|end|error" } } }
   var OrigWS = window.WebSocket;
   function PatchedWS(url, protocols) {
     var ws = protocols ? new OrigWS(url, protocols) : new OrigWS(url);
@@ -43,11 +40,9 @@
   Object.keys(OrigWS).forEach(function(k) { try { PatchedWS[k] = OrigWS[k]; } catch(e) {} });
   window.WebSocket = PatchedWS;
 
-  // ── 3. Watch DOM for "refresh recommended" text ────────────────────────────
   var _domObserver = new MutationObserver(function() {
     var body = document.body;
     if (body && /refresh\s+recommended/i.test(body.innerText)) {
-      console.log('[clawbot-patch] "refresh recommended" detected, clicking refresh in 200ms');
       setTimeout(clickRefresh, 200);
     }
   });

@@ -57,11 +57,13 @@ metadata:
 /data/data/com.termux/files/usr/bin/python3 /data/data/com.termux/files/home/ui-control.py key recent  # 最近任务
 ```
 
-## 截图
+## 截屏（屏幕截图，不是相机拍照）
 
 ```bash
 /data/data/com.termux/files/usr/bin/python3 /data/data/com.termux/files/home/ui-control.py screenshot
 ```
+
+> 注意：这是截取手机屏幕当前画面，需要屏幕处于亮屏解锁状态。与相机拍照（termux-camera-photo）完全不同。
 
 ## Guidelines
 
