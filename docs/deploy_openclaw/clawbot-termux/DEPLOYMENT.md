@@ -75,7 +75,10 @@ nginx -t && nginx -s reload
 ```bash
 # Termux 内执行
 pkg update && pkg upgrade -y
-pkg install nodejs-lts termux-api openssh tmux -y
+pkg install nodejs-lts termux-api openssh tmux python -y
+
+# Python 依赖（ui-control screenshot 压缩用）
+pip install Pillow
 
 # 安装 OpenClaw
 npm install -g openclaw@latest

@@ -15,8 +15,11 @@ echo "[1/6] Updating packages..."
 pkg update -y && pkg upgrade -y
 
 # ---- 2. Install dependencies ----
-echo "[2/6] Installing Node.js, termux-api, openssh, tmux..."
-pkg install nodejs-lts termux-api openssh tmux -y
+echo "[2/6] Installing Node.js, Python, termux-api, openssh, tmux..."
+pkg install nodejs-lts python termux-api openssh tmux -y
+
+echo "  Installing Python dependencies (Pillow for screenshot compression)..."
+pip install Pillow --quiet
 
 # ---- 3. Environment variables for Node.js ----
 echo "[3/6] Configuring environment variables..."
