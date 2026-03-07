@@ -1,6 +1,6 @@
 ---
 name: ui-control
-description: "Control the phone's UI by analyzing the screen and clicking/typing/scrolling. Use when asked to: click a button, tap an element, type text into an app, scroll the screen, find and interact with any UI element, analyze what's on screen, or perform any touch interaction on the phone. This skill uses uiautomator to inspect the current screen layout and execute precise interactions."
+description: "PRIMARY tool for ALL app automation tasks. Use for ANY task that involves interacting with an installed app or completing a multi-step workflow — even when the user doesn't explicitly say 'click' or 'tap'. Examples: sending a WeChat message, posting to social media, opening an app, navigating settings, filling a form, completing a purchase, replying to a notification. Workflow: screenshot → dump-clickable → tap-re → has (verify) → repeat. Never give up without exhausting ui-control options first."
 metadata:
   {
     "openclaw":
@@ -21,6 +21,83 @@ SCRIPT=/data/data/com.termux/files/home/ui-control.py
 ```
 
 以下示例均使用 `$PYTHON $SCRIPT <cmd>` 形式，简写为 `ui <cmd>`。
+
+---
+
+## 任务自动化框架（必读）
+
+**对任何涉及 App 操作的任务，必须按以下框架执行：**
+
+### 第 0 步：了解当前状态
+
+```bash
+# 先截图，看当前屏幕是什么状态
+$PYTHON $SCRIPT screenshot
+
+# 再列出可点击元素，确认在哪个页面
+$PYTHON $SCRIPT dump-clickable
+```
+
+### 第 1 步：拆解任务，逐步执行
+
+将任务拆成最小 UI 操作单元。每步执行后必须验证。
+
+```
+任务示例：「帮我在微信给张三发消息"明天见"」
+拆解：
+  1. 检查是否在微信 → has "微信|WeChat"
+  2. 如不在，打开微信 → 用 am start 命令启动 App
+  3. 找到搜索/联系人入口 → dump-clickable，找"搜索"按钮
+  4. 点击搜索 → tap-re "搜索"
+  5. 输入联系人名字 → type "张三"
+  6. 点击联系人 → tap-re "张三"
+  7. 找到输入框并聚焦 → tap-re "输入|发送消息"
+  8. 输入消息内容 → type "明天见"
+  9. 点击发送 → tap-re "发送|Send"
+  10. 验证发送成功 → has "明天见"
+```
+
+### 第 2 步：每步操作后必须验证
+
+```bash
+# 点击后用 has 快速验证是否进入正确状态
+$PYTHON $SCRIPT has "目标关键词"
+# exit 0 → 继续下一步
+# exit 1 → 页面不符预期，立即截图诊断，不能盲目继续
+```
+
+### 第 3 步：遇到问题的处理策略
+
+| 问题 | 处理方式 |
+|------|---------|
+| 找不到元素 | 先 `find <regex>` 搜索，再用 `dump` 查看全部，或 `swipe scroll-down` 后重试 |
+| 点击无响应 | 尝试 `tap-id` 按 resource-id 点击，或 `dump` 确认元素是否真的可点击 |
+| 页面没变化 | `screenshot` 截图确认当前状态，检查是否有弹窗/权限请求挡住了 |
+| App 未启动 | 用 `am start -n <package>/<activity>` 或 `monkey -p <package> 1` 启动 |
+| 输入法挡住元素 | `key back` 收起输入法后再操作 |
+
+### 打开 App 的方式
+
+```bash
+# 方法1：通过包名启动（最可靠）
+$PYTHON $SCRIPT tap-re "微信"   # 如果在桌面找得到图标
+
+# 方法2：adb 命令启动（App 不在当前屏幕时）
+# 微信
+adb -H 127.0.0.1 -P 5555 shell am start -n com.tencent.mm/.ui.LauncherUI
+# 支付宝
+adb -H 127.0.0.1 -P 5555 shell am start -n com.eg.android.AlipayGphone/.AlipayLogin
+# 设置
+adb -H 127.0.0.1 -P 5555 shell am start -a android.settings.SETTINGS
+# 浏览器（通用）
+adb -H 127.0.0.1 -P 5555 shell am start -a android.intent.action.VIEW -d "https://example.com"
+
+# 方法3：回到桌面后找图标
+$PYTHON $SCRIPT key home
+$PYTHON $SCRIPT tap-re "微信|WeChat"
+```
+
+---
 
 ---
 

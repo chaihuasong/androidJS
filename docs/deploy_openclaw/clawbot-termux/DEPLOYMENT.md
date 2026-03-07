@@ -126,7 +126,7 @@ GEMINI_API_KEY=AIzaSy-xxx
       id: "default", default: true,
       identity: {
         name: "ClawBot",
-        theme: "Android phone assistant that controls hardware via Termux:API",
+        theme: "Android AI agent that controls apps and hardware on the phone. For ANY task involving apps (WeChat, browser, settings, games, etc.), ALWAYS use the ui-control skill as the primary automation tool. Standard automation loop: screenshot → dump-clickable → tap-re → has (verify) → repeat. Only use phone-control for hardware (torch, camera, sensors, calls, SMS).",
         emoji: "🤖",
       },
     }],
@@ -390,6 +390,8 @@ adb shell "su -c 'cp /tmp/service.sh /data/adb/modules/usf_termux_whitelist/serv
 | Agent session 卡死不回复 | DeepSeek 流式请求挂起（`tool_stream:true` 引起）| 将 `tool_stream` 设为 `false`，重启 openclaw |
 | SSH 隧道后台断开（5 秒）| Infinix XOS USF Hiber 模块检测 uid=10231 流量为零，调用 `netd destroyNetworkByUid` 销毁所有 TCP socket | root 修复：bind mount 补丁版 `hiber.json`（含 com.termux 白名单）→ 重启 hiber + USF app；用 Magisk 模块实现开机持久化（见 §2.5）|
 | bind mount 重启后失效 | Android 重启会恢复 tmpfs/overlayfs 状态 | 安装 Magisk 模块 `usf_termux_whitelist`，`service.sh` 每次开机自动重新应用 bind mount |
+| ui-control screenshot 超时 | `adb exec-out screencap -p` 通过 TCP loopback 流式传大图超时 | 改为三步：screencap 保存到 /sdcard → Termux Python PIL 压缩为 JPEG quality=70 → adb pull；需 `pip install Pillow` |
+| Agent 不用 ui-control 自动化 | Agent theme 定位为"硬件控制"，skill 描述太被动，无任务分解框架 | 更新 `openclaw.json` theme 强调 ui-control 为首选；更新 SKILL.md description 覆盖隐式 UI 任务；新增"任务自动化框架"章节 |
 
 ---
 
@@ -407,6 +409,8 @@ adb shell "su -c 'cp /tmp/service.sh /data/adb/modules/usf_termux_whitelist/serv
 | 手机 | `~/.openclaw/workspace/skills/weather/SKILL.md` | 天气查询 |
 | 手机 | `~/.openclaw/workspace/skills/system-status/SKILL.md` | 系统状态 |
 | 手机 | `~/.openclaw/workspace/skills/file-manager/SKILL.md` | 文件管理 |
+| 手机 | `~/.openclaw/workspace/skills/ui-control/SKILL.md` | UI 自动化核心技能（uiautomator + 任务框架）|
+| 手机 | `~/ui-control.py` | UI 自动化脚本（dump/tap/type/swipe/screenshot）|
 | 手机 | `~/.openclaw/workspace/skills/qwen-vision/SKILL.md` | 视觉分析技能（DashScope/Gemini/SiliconFlow）|
 | 手机 | `~/vision.py` | 视觉分析脚本 |
 | 手机 | `~/clawbot-launch.sh` | 一键启动脚本 |

@@ -456,12 +456,52 @@ def cmd_screenshot():
     name      = f"ui-{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}.png"
     local     = f"{tmpdir}/{name}"
 
-    with open(local, 'wb') as f:
-        r = subprocess.run(f'{ADB} exec-out screencap -p',
-                           shell=True, stdout=f, stderr=subprocess.PIPE, timeout=15)
-    if r.returncode != 0 or os.path.getsize(local) < 1000:
+    remote_png = '/sdcard/ui_screenshot_tmp.png'
+    remote_jpg = '/sdcard/ui_screenshot_tmp.jpg'
+    name_jpg   = name.replace('.png', '.jpg')
+    local_jpg  = local.replace('.png', '.jpg')
+
+    # 1. screencap → /sdcard PNG（带重试重连）
+    reconnect_adb()
+    for attempt in range(1, 4):
+        timeout = [15, 25, 35][attempt - 1]
+        log(f"  截图第{attempt}次（超时{timeout}s）...")
+        try:
+            root_shell(f'{SCREENCAP} -p {remote_png}', timeout=timeout)
+            break
+        except subprocess.TimeoutExpired:
+            log(f"  第{attempt}次超时，重连 adb...")
+            root_shell('pkill -9 -f screencap 2>/dev/null; true')
+            time.sleep(1)
+            reconnect_adb()
+            if attempt == 3:
+                log("ERROR: screencap 全部超时")
+                sys.exit(1)
+
+    # 2. 在手机本地压缩 PNG → JPEG（直接用 Termux Python，不走 adb）
+    log("  压缩截图...")
+    compress = subprocess.run(
+        f'python3 -c "from PIL import Image; '
+        f'img=Image.open(\'{remote_png}\').convert(\'RGB\'); '
+        f'img.save(\'{remote_jpg}\', \'JPEG\', quality=70)"',
+        shell=True, capture_output=True, timeout=15
+    )
+    if compress.returncode == 0:
+        pull_src, pull_local, name = remote_jpg, local_jpg, name_jpg
+        root_shell(f'rm -f {remote_png}')
+        log("  压缩成功（JPEG quality=70）")
+    else:
+        log(f"  压缩失败（{compress.stderr.decode().strip()}），使用原始 PNG")
+        pull_src, pull_local = remote_png, local
+
+    # 3. adb pull 压缩后的文件
+    r = subprocess.run(f'{ADB} pull {pull_src} {pull_local}',
+                       shell=True, capture_output=True, timeout=30)
+    root_shell(f'rm -f {pull_src}')
+    if r.returncode != 0 or not os.path.exists(pull_local) or os.path.getsize(pull_local) < 1000:
         log(f"ERROR: 截图失败: {r.stderr.decode()}")
         sys.exit(1)
+    local = pull_local
 
     r = subprocess.run(
         f"scp -o StrictHostKeyChecking=no {local} {CLOUD}:{PHOTO_DIR}/{name}",

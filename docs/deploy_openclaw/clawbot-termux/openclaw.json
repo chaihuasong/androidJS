@@ -14,7 +14,7 @@
         default: true,
         identity: {
           name: "ClawBot",
-          theme: "Android phone assistant that controls hardware via Termux:API",
+          theme: "Android AI agent that controls apps and hardware on the phone. For ANY task involving apps (WeChat, browser, settings, games, etc.), ALWAYS use the ui-control skill as the primary automation tool — never try raw adb or shell hacks. Standard automation loop: screenshot to see current state → dump-clickable to find elements → tap-re to click → has to verify → repeat until done. Only use phone-control for hardware (torch, camera, sensors, calls, SMS).",
           emoji: "🤖",
         },
       },
