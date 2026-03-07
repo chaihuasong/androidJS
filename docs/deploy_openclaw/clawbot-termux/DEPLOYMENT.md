@@ -201,6 +201,10 @@ sleep 12
 tmux new-window -t clawbot -n tun "bash $HOME/tunnel-loop.sh"
 
 sleep 3
+# 窗口3: 持续 ping 云服务器，防止 Android 后台切断网络接口
+tmux new-window -t clawbot -n ping "ping 114.55.130.197"
+
+sleep 2
 echo "ClawBot started. Tunnel will auto-reconnect if dropped."
 ```
 
@@ -213,7 +217,7 @@ while true; do
   # 清理服务器上可能僵尸占着端口的旧 sshd（否则 ExitOnForwardFailure 会立即退出）
   ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@114.55.130.197 "fuser -k 28789/tcp 2>/dev/null; true" 2>/dev/null || true
   echo "$(date): Starting SSH tunnel..."
-  ssh -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
+  ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
       -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no \
       -o TCPKeepAlive=yes -o ConnectTimeout=10 \
       -R 28789:127.0.0.1:28789 root@114.55.130.197 -N

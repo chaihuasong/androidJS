@@ -28,7 +28,7 @@ sleep 3
 
 # Create a second window for the SSH reverse tunnel
 tmux new-window -t "$SESSION_NAME" -n tunnel \
-  "echo '--- SSH Reverse Tunnel to $CLOUD_SERVER ---'; echo 'Mapping localhost:$GATEWAY_PORT -> $CLOUD_SERVER:$GATEWAY_PORT'; ssh -o ServerAliveInterval=5 -o ServerAliveCountMax=2 -R $GATEWAY_PORT:127.0.0.1:$GATEWAY_PORT $CLOUD_SERVER -N; echo 'Tunnel disconnected. Press Enter to retry.'; read"
+  "echo '--- SSH Reverse Tunnel to $CLOUD_SERVER ---'; echo 'Mapping localhost:$GATEWAY_PORT -> $CLOUD_SERVER:$GATEWAY_PORT'; ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -R $GATEWAY_PORT:127.0.0.1:$GATEWAY_PORT $CLOUD_SERVER -N; echo 'Tunnel disconnected. Press Enter to retry.'; read"
 
 echo ""
 echo "ClawBot is running in tmux session '$SESSION_NAME'"
