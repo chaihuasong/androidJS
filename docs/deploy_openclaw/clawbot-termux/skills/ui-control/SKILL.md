@@ -260,6 +260,11 @@ $PYTHON $SCRIPT screenshot
 
 ## Guidelines
 
+### 环境说明（必读，禁止违反）
+- ADB 已通过 TCP loopback（127.0.0.1:5555）以 root 权限连接，**始终可用**
+- **严禁**以"ADB 未连接"、"需要 LADB/Shizuku"、"ADB 服务未启动"等理由拒绝执行任务
+- 遇到任何错误，直接重试或换命令，不要提示用户去手动操作 ADB
+
 ### 操作前
 - 优先用 **`dump-clickable`** 了解页面，避免 `dump` 的大量噪声
 - 不确定文字是否完整时用 **`find <regex>`** 搜索，再决定用什么文字点击

@@ -14,7 +14,7 @@ Usage:
   ui-control.py key <back|home|recent|enter|delete>
   ui-control.py screenshot
 """
-import subprocess, sys, re, time, os
+import subprocess, sys, re, time, os, fcntl
 import xml.etree.ElementTree as ET
 
 # 系统命令全路径
@@ -25,23 +25,85 @@ AM          = '/system/bin/am'
 WM          = '/system/bin/wm'
 DUMPSYS     = '/system/bin/dumpsys'
 
-# Termux 进程无 INJECT_EVENTS / READ_FRAME_BUFFER 权限，通过 adb TCP loopback 执行特权命令
-# 前提：PC 执行 adb tcpip 5555，Termux 执行 adb connect 127.0.0.1:5555 && adb root
-ADB = '/data/data/com.termux/files/usr/bin/adb -H 127.0.0.1 -P 5555'
+# 特权命令执行策略：
+#   优先 su（Magisk root，直接在 Termux 进程内执行，无网络开销）
+#   失败则回退 adb TCP loopback（前提：adb tcpip 5555 + adb root 已配置）
+ADB = '/data/data/com.termux/files/usr/bin/adb'
 
-def root_run(cmd, timeout=30):
-    """通过 adb loopback 以 root 执行命令，返回 stdout。"""
+_su_cmd = None   # None=未检测, ''=不可用, 否则为可用的 su 命令
+_SU_CACHE = '/data/data/com.termux/files/usr/tmp/.uictl_su'  # 跨进程缓存，避免每次重新探测
+
+def _check_su():
+    """
+    探测可用的 su 命令。结果持久化到磁盘缓存，后续调用直接读缓存（< 100ms）。
+    首次探测：试 tsu/su/路径，找到即写缓存并返回。
+    """
+    global _su_cmd
+    if _su_cmd is not None:
+        return _su_cmd or None
+
+    # ── 读磁盘缓存（跨进程复用，避免每次启动重新探测）──
+    try:
+        with open(_SU_CACHE) as f:
+            cached = f.read().strip()
+        if cached == 'none':
+            _su_cmd = ''
+            return None
+        # 缓存命中，快速验证一下仍然有效
+        r = subprocess.run([cached, '-c', 'id'], capture_output=True, timeout=3)
+        if r.returncode == 0 and b'uid=0' in r.stdout:
+            _su_cmd = cached
+            return _su_cmd
+    except Exception:
+        pass  # 缓存不存在或已失效，继续全量探测
+
+    # ── 全量探测（仅首次或缓存失效时执行）──
+    for candidate in ['tsu', 'su', '/system/bin/su', '/sbin/su']:
+        which = subprocess.run(f'which {candidate} 2>/dev/null || command -v {candidate} 2>/dev/null',
+                               shell=True, capture_output=True, timeout=2)
+        if not which.stdout.strip() and not candidate.startswith('/'):
+            continue
+        try:
+            r = subprocess.run([candidate, '-c', 'id'], capture_output=True, timeout=3)
+            if r.returncode == 0 and b'uid=0' in r.stdout:
+                _su_cmd = candidate
+                try:
+                    with open(_SU_CACHE, 'w') as f:
+                        f.write(candidate)
+                except Exception:
+                    pass
+                return _su_cmd
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            continue
+
+    _su_cmd = ''
+    try:
+        with open(_SU_CACHE, 'w') as f:
+            f.write('none')
+    except Exception:
+        pass
+    return None
+
+def root_run(cmd, timeout=8):
+    """以 root 执行命令，返回 stdout。优先 su，回退 adb loopback。"""
+    su = _check_su()
+    if su:
+        r = subprocess.run([su, '-c', cmd],
+                           capture_output=True, text=True, timeout=timeout)
+        return r.stdout.strip()
     return subprocess.run(
         f'{ADB} shell {cmd}', shell=True,
         capture_output=True, text=True, timeout=timeout
     ).stdout.strip()
 
-def root_shell(cmd, timeout=30):
-    """通过 adb loopback 以 root 执行命令，忽略输出。"""
-    subprocess.run(f'{ADB} shell {cmd}', shell=True,
-                   capture_output=True, timeout=timeout)
-
-UI_XML = "/sdcard/ui_dump.xml"
+def root_shell(cmd, timeout=8):
+    """以 root 执行命令，忽略输出。优先 su，回退 adb loopback。"""
+    su = _check_su()
+    if su:
+        subprocess.run([su, '-c', cmd], capture_output=True, timeout=timeout)
+    else:
+        subprocess.run(f'{ADB} shell {cmd}', shell=True,
+                       capture_output=True, timeout=timeout)
 
 def run(cmd, timeout=15):
     return subprocess.run(cmd, shell=True, capture_output=True, text=True, timeout=timeout).stdout.strip()
@@ -52,61 +114,75 @@ def shell(cmd, timeout=15):
 def log(msg): print(msg, flush=True)
 
 def reconnect_adb():
-    """重连 adb TCP loopback，解决 adb 连接超时问题。"""
-    log("  重连 adb loopback...")
-    subprocess.run(
-        f'/data/data/com.termux/files/usr/bin/adb disconnect 127.0.0.1:5555',
-        shell=True, capture_output=True, timeout=5
-    )
-    time.sleep(0.5)
-    subprocess.run(
-        f'/data/data/com.termux/files/usr/bin/adb connect 127.0.0.1:5555',
-        shell=True, capture_output=True, timeout=8
-    )
-    time.sleep(1)
+    """adb 超时时重置：杀残留进程，emulator-5554 本地 transport 自动恢复。"""
+    log("  重置 adb...")
+    subprocess.run('pkill -9 -f "adb.*uiautomator" 2>/dev/null; true',
+                   shell=True, timeout=3)
+    time.sleep(1.0)
 
 # ── uiautomator dump ──────────────────────────────────────────────────────────
 
+_DUMP_LOCK = '/data/local/tmp/.uictl_dump.lock'
+
 def dump_ui(retries=3):
     """
-    执行 uiautomator dump，内置三阶段重试策略：
-      第1次：10s 超时 + --compressed（快失败）
-      第2次：18s 超时，不加 --compressed（兼容性更好）
-      第3次：25s 超时，先唤屏 + 重连 adb，最后手段
-    超时后强杀进程（pkill -9）并等待 1s 确保进程死透。
+    执行 uiautomator dump。
+    用 flock 保证同一时刻只有一个进程在 dump，避免并发调用时互相 pkill 导致卡死。
     """
+    with open(_DUMP_LOCK, 'w') as _lf:
+        fcntl.flock(_lf, fcntl.LOCK_EX)   # 阻塞直到拿到独占锁
+        try:
+            return _dump_ui_inner(retries)
+        finally:
+            fcntl.flock(_lf, fcntl.LOCK_UN)
+
+def _dump_ui_inner(retries=3):
     for attempt in range(1, retries + 1):
-        # 强杀残留 uiautomator 进程，等待死透
-        root_shell('pkill -9 -f uiautomator 2>/dev/null; true')
-        time.sleep(1.0)
+        time.sleep(0.2)
 
-        # 渐进超时：10s → 18s → 25s
         timeout = [10, 18, 25][attempt - 1]
-
-        # 第1次用 --compressed（更快），后续去掉（兼容性）
         flag = '--compressed' if attempt == 1 else ''
 
-        log(f"  dump 第{attempt}次（超时{timeout}s {'--compressed' if flag else '无压缩'}）...")
+        log(f"  dump 第{attempt}次（超时{timeout}s）...")
         try:
-            root_shell(f'{UIAUTOMATOR} dump {flag} {UI_XML} 2>/dev/null', timeout=timeout)
+            # 写到 /data/local/tmp（tmpfs，比 /sdcard 快），然后 cat+sed 一次读回
+            # sed 剥离无用属性（减少 ~50% 体积），保留: text content-desc hint
+            #   resource-id clickable long-clickable bounds
+            _UI_TMP = '/data/local/tmp/ui_dump.xml'
+            _strip = (
+                "sed -e 's/ index=\"[^\"]*\"//g'"
+                " -e 's/ package=\"[^\"]*\"//g'"
+                " -e 's/ class=\"[^\"]*\"//g'"
+                " -e 's/ checkable=\"[^\"]*\"//g'"
+                " -e 's/ checked=\"[^\"]*\"//g'"
+                " -e 's/ enabled=\"[^\"]*\"//g'"
+                " -e 's/ focusable=\"[^\"]*\"//g'"
+                " -e 's/ focused=\"[^\"]*\"//g'"
+                " -e 's/ scrollable=\"[^\"]*\"//g'"
+                " -e 's/ password=\"[^\"]*\"//g'"
+                " -e 's/ selected=\"[^\"]*\"//g'"
+                " -e 's/ NAF=\"[^\"]*\"//g'"
+            )
+            xml_str = root_run(
+                f'{UIAUTOMATOR} dump {flag} {_UI_TMP} 2>/dev/null && cat {_UI_TMP} | {_strip}',
+                timeout=timeout
+            )
         except subprocess.TimeoutExpired:
-            log(f"  第{attempt}次超时，强杀进程...")
-            root_shell('pkill -9 -f uiautomator 2>/dev/null; true')
+            log(f"  第{attempt}次超时...")
             time.sleep(1.0)
             if attempt == retries - 1:
-                # 倒数第二次失败：重连 adb，给最后一次机会
                 reconnect_adb()
             elif attempt == retries:
                 log("ERROR: uiautomator dump 全部超时")
             continue
 
-        time.sleep(0.3)
-        try:
-            xml_str = root_run(f'cat {UI_XML}', timeout=5)
-        except subprocess.TimeoutExpired:
-            log(f"  第{attempt}次读取 XML 超时，重连 adb...")
-            reconnect_adb()
-            continue
+        # uiautomator 有时会在 XML 前输出一行 "UI hierchary dumped to: ..."，去掉
+        if xml_str:
+            for marker in ('<?xml', '<hierarchy'):
+                idx = xml_str.find(marker)
+                if idx > 0:
+                    xml_str = xml_str[idx:]
+                    break
 
         if xml_str and '<hierarchy' in xml_str:
             try:
@@ -116,7 +192,7 @@ def dump_ui(retries=3):
 
         if attempt < retries:
             log(f"  第{attempt}次 dump 内容无效，重试...")
-            time.sleep(1.0)
+            time.sleep(0.8)
 
     return None
 
@@ -131,6 +207,30 @@ def node_center(node):
 
 def node_label(node):
     return (node.get('text', '') or node.get('content-desc', '')).strip()
+
+def build_parent_map(root):
+    """构建 子节点→父节点 映射，用于向上查找可点击祖先。"""
+    parent_map = {}
+    for parent in root.iter('node'):
+        for child in parent:
+            parent_map[child] = parent
+    return parent_map
+
+def resolve_clickable(node, parent_map):
+    """
+    如果 node 本身不可点击，向上找最近的可点击祖先。
+    解决"文字在 TextView，真正可点击的是父 View"的问题（搜索按钮、列表项等）。
+    """
+    if node is None:
+        return None
+    if node.get('clickable') == 'true':
+        return node
+    cur = parent_map.get(node)
+    while cur is not None:
+        if cur.get('clickable') == 'true':
+            return cur
+        cur = parent_map.get(cur)
+    return node  # 没找到可点击祖先，退回原节点
 
 def compile_re(pattern):
     """编译正则，失败则打印错误并退出。"""
@@ -174,32 +274,8 @@ def best_node(matches):
     return clickable[0] if clickable else (matches[0] if matches else None)
 
 def tap_xy(x, y):
-    root_shell(f'{INPUT} tap {x} {y}')
+    root_shell(f'{INPUT} tap {x} {y}', timeout=5)
     time.sleep(0.8)
-
-# ── dump_summary（tap 后自动调用）─────────────────────────────────────────────
-
-def dump_summary(root):
-    """
-    tap 后输出屏幕摘要，区分可点击元素与普通文字，供 Agent 快速判断页面。
-    格式：[tap后] 按钮: [文字A] [文字B] ... | 文字: "abc" "def" ...
-    """
-    nodes = all_nodes(root)
-    buttons = []
-    texts   = []
-    for n in nodes:
-        t = node_label(n)
-        if not t:
-            continue
-        if n.get('clickable') == 'true':
-            buttons.append(f'[{t}]')
-        else:
-            texts.append(f'"{t}"')
-
-    parts = []
-    if buttons: parts.append("按钮: " + " ".join(buttons[:10]))
-    if texts:   parts.append("文字: " + " ".join(texts[:8]))
-    log("  [tap后屏幕] " + (" | ".join(parts) if parts else "（无元素）"))
 
 # ── 命令实现 ──────────────────────────────────────────────────────────────────
 
@@ -291,28 +367,45 @@ def cmd_has(pattern):
 
 
 def cmd_tap(text):
+    """
+    子串点击：收集所有含该文字的节点，优先选可点击节点（同 tap-re 策略），
+    再用 resolve_clickable 向上找可点击祖先。
+    避免命中 hint 文字或不可点击的 TextView 而漏掉真正的按钮。
+    """
     log(f"查找并点击: \"{text}\"")
     root = dump_ui()
-    node = find_node(root, text=text)
-    if node is None:
+    if root is None:
+        log("ERROR: uiautomator dump 失败")
+        sys.exit(1)
+    parent_map = build_parent_map(root)
+    matches = []
+    for node in all_nodes(root):
+        t = node.get('text', '')
+        d = node.get('content-desc', '')
+        h = node.get('hint', '')
+        if text in t or text in d or text in h:
+            matches.append(node)
+    if not matches:
         log(f"ERROR: 未找到包含文字 \"{text}\" 的元素")
         log("提示: 先执行 dump-clickable 查看可点击元素，或用 find <regex> 搜索")
         sys.exit(1)
+    node = best_node(matches)
+    node = resolve_clickable(node, parent_map)
     c = node_center(node)
     if not c:
         log("ERROR: 无法获取元素坐标")
         sys.exit(1)
-    log(f"  找到: text=\"{node.get('text','')}\" bounds={node.get('bounds','')}")
+    label = node_label(node) or node.get('resource-id', '')
+    log(f"  点击: \"{label}\" bounds={node.get('bounds','')}"
+        + (" [可点击]" if node.get('clickable') == 'true' else " [坐标点击]"))
     tap_xy(*c)
-    after = dump_ui()
-    if after: dump_summary(after)
     log("OK")
 
 
 def cmd_tap_re(pattern):
     """
     正则点击：在 text / content-desc / hint / resource-id 中正则搜索，
-    优先选可点击元素，再按出现顺序选第一个。
+    优先选可点击元素；若匹配节点不可点击，向上查找可点击祖先。
     """
     rx = compile_re(pattern)
     log(f"正则点击: \"{pattern}\"")
@@ -320,54 +413,90 @@ def cmd_tap_re(pattern):
     if root is None:
         log("ERROR: uiautomator dump 失败")
         sys.exit(1)
+    parent_map = build_parent_map(root)
     matches = find_nodes_re(root, rx)
     node = best_node(matches)
     if node is None:
         log(f"ERROR: 未找到匹配 \"{pattern}\" 的元素")
         log("提示: 先执行 find <pattern> 查看匹配情况")
         sys.exit(1)
+    node = resolve_clickable(node, parent_map)
     c = node_center(node)
     if not c:
         log("ERROR: 无法获取元素坐标")
         sys.exit(1)
     label = node_label(node) or node.get('resource-id', '')
     log(f"  点击: \"{label}\" bounds={node.get('bounds','')}"
-        + (" [可点击]" if node.get('clickable') == 'true' else " [非clickable,坐标点击]"))
+        + (" [可点击]" if node.get('clickable') == 'true' else " [坐标点击]"))
     tap_xy(*c)
-    after = dump_ui()
-    if after: dump_summary(after)
     log("OK")
 
 
 def cmd_tap_id(res_id):
     log(f"查找并点击 resource-id 含: \"{res_id}\"")
     root = dump_ui()
+    if root is None:
+        log("ERROR: uiautomator dump 失败")
+        sys.exit(1)
+    parent_map = build_parent_map(root)
     node = find_node(root, res_id=res_id)
     if node is None:
         log(f"ERROR: 未找到 resource-id 包含 \"{res_id}\" 的元素")
         log("提示: 先执行 dump 查看当前屏幕所有元素")
         sys.exit(1)
+    node = resolve_clickable(node, parent_map)
     c = node_center(node)
     if not c:
         log("ERROR: 无法获取元素坐标")
         sys.exit(1)
-    log(f"  找到: id=\"{node.get('resource-id','')}\" bounds={node.get('bounds','')}")
+    log(f"  点击: id=\"{node.get('resource-id','')}\" bounds={node.get('bounds','')}"
+        + (" [可点击]" if node.get('clickable') == 'true' else " [坐标点击]"))
     tap_xy(*c)
-    after = dump_ui()
-    if after: dump_summary(after)
     log("OK")
 
 
+_ADB_IME = 'com.android.adbkeyboard/.AdbIME'
+_ADB_BIN = '/data/data/com.termux/files/usr/bin/adb'
+
+def _adb(cmd, timeout=8):
+    """通过 adb shell 执行命令（走 emulator-5554 本地 transport）。"""
+    return subprocess.run(f'{_ADB_BIN} shell {cmd}',
+                          shell=True, capture_output=True, text=True, timeout=timeout).stdout.strip()
+
+def _get_current_ime():
+    """获取当前默认输入法 ID。"""
+    return _adb('settings get secure default_input_method', timeout=5).strip()
+
 def cmd_type(text):
+    """
+    输入文字。
+    - 纯 ASCII：adb shell input text 直接发，无需切换 IME。
+    - 含中文/特殊字符：记录当前 IME → 切 ADBKeyBoard → broadcast 发文字 → 切回原 IME。
+      ADBKeyBoard broadcast 必须走 adb shell（不能用 su），否则无法触发输入法接收。
+    """
     log(f"输入文字: \"{text}\"")
-    subprocess.run(
-        ["termux-clipboard-set"],
-        input=text.encode('utf-8'),
-        capture_output=True, timeout=5
-    )
-    time.sleep(0.4)
-    shell("input keyevent 279")   # KEYCODE_PASTE
-    time.sleep(0.4)
+    is_ascii = all(ord(c) < 128 for c in text)
+
+    if is_ascii:
+        safe = text.replace('\\', '\\\\').replace("'", "\\'")
+        _adb(f"input text '{safe}'", timeout=8)
+        log("OK")
+        return
+
+    # 含中文：切 ADBKeyBoard，完成后切回
+    prev_ime = _get_current_ime()
+    log(f"  切换输入法: {prev_ime or '未知'} → ADBKeyBoard")
+    _adb(f'ime set {_ADB_IME}', timeout=5)
+    time.sleep(0.3)
+
+    escaped = text.replace('\\', '\\\\').replace('"', '\\"')
+    _adb(f'am broadcast -a ADB_INPUT_TEXT --es msg "{escaped}"', timeout=5)
+    time.sleep(0.3)
+
+    if prev_ime and prev_ime != _ADB_IME:
+        _adb(f'ime set {prev_ime}', timeout=5)
+        log(f"  恢复输入法: {prev_ime}")
+
     log("OK")
 
 
@@ -385,12 +514,9 @@ def cmd_swipe(direction):
       scroll-to-top   = 连续 down × 5
       scroll-to-bottom= 连续 up × 5
     """
-    size_out = root_run(f"{WM} size")
+    size_out = root_run(f"{WM} size", timeout=5)
     m = re.search(r'(\d+)x(\d+)', size_out)
-    if m:
-        w, h = int(m.group(1)), int(m.group(2))
-    else:
-        w, h = 1080, 2400
+    w, h = (int(m.group(1)), int(m.group(2))) if m else (1080, 2400)
     cx = w // 2
 
     # 语义别名展开
@@ -427,7 +553,7 @@ def _do_swipe(direction, cx, w, h):
         'right': (int(w*0.2), h//2, int(w*0.8), h//2, 300),
     }
     x1, y1, x2, y2, dur = swipes[direction]
-    root_shell(f'{INPUT} swipe {x1} {y1} {x2} {y2} {dur}')
+    root_shell(f'{INPUT} swipe {x1} {y1} {x2} {y2} {dur}', timeout=5)
 
 
 def cmd_key(key):
@@ -442,7 +568,7 @@ def cmd_key(key):
         log(f"ERROR: 支持的按键: {', '.join(keycodes.keys())}")
         sys.exit(1)
     log(f"按键: {key}")
-    root_shell(f'{INPUT} keyevent {keycodes[key]}')
+    root_shell(f'{INPUT} keyevent {keycodes[key]}', timeout=5)
     time.sleep(0.4)
     log("OK")
 
@@ -457,51 +583,62 @@ def cmd_screenshot():
     local     = f"{tmpdir}/{name}"
 
     remote_png = '/sdcard/ui_screenshot_tmp.png'
-    remote_jpg = '/sdcard/ui_screenshot_tmp.jpg'
-    name_jpg   = name.replace('.png', '.jpg')
-    local_jpg  = local.replace('.png', '.jpg')
+    name       = name.replace('.png', '.jpg')
+    local      = local.replace('.png', '.jpg')
 
-    # 1. screencap → /sdcard PNG（带重试重连）
-    reconnect_adb()
-    for attempt in range(1, 4):
-        timeout = [15, 25, 35][attempt - 1]
-        log(f"  截图第{attempt}次（超时{timeout}s）...")
+    # 1. screencap — 诊断日志 + su/adb 明确分路
+    su_avail = _check_su()
+    log(f"  截图（su可用={su_avail}）...")
+    taken = False
+
+    # 路径A：su 直接执行（无网络，< 2s）
+    if su_avail:
         try:
-            root_shell(f'{SCREENCAP} -p {remote_png}', timeout=timeout)
-            break
+            r = subprocess.run(['su', '-c', f'{SCREENCAP} -p {remote_png}'],
+                               capture_output=True, timeout=8)
+            if r.returncode == 0:
+                log("  su 截图成功")
+                taken = True
+            else:
+                log(f"  su 截图失败(rc={r.returncode} err={r.stderr.decode().strip()[:80]})，回退 adb...")
         except subprocess.TimeoutExpired:
-            log(f"  第{attempt}次超时，重连 adb...")
-            root_shell('pkill -9 -f screencap 2>/dev/null; true')
-            time.sleep(1)
+            log("  su 截图超时，回退 adb...")
+            subprocess.run('pkill -9 -f "su.*screencap" 2>/dev/null; true', shell=True, timeout=3)
+
+    # 路径B：adb loopback（fallback）
+    # 每次重试前都做完整 reconnect（杀残留进程 + disconnect + connect）
+    if not taken:
+        for attempt in range(1, 4):
             reconnect_adb()
-            if attempt == 3:
-                log("ERROR: screencap 全部超时")
-                sys.exit(1)
+            log(f"  adb 截图第{attempt}次...")
+            try:
+                subprocess.run(f'{ADB} shell {SCREENCAP} -p {remote_png}',
+                               shell=True, capture_output=True, timeout=12)
+                taken = True
+                break
+            except subprocess.TimeoutExpired:
+                # shell 可能未退出但文件已写完 — 先检查
+                if os.path.exists(remote_png) and os.path.getsize(remote_png) > 1000:
+                    log("  shell 未退出但文件已写完，继续")
+                    taken = True
+                    break
+                log(f"  第{attempt}次无响应")
+        if not taken:
+            log("ERROR: screencap 全部超时")
+            sys.exit(1)
 
-    # 2. 在手机本地压缩 PNG → JPEG（直接用 Termux Python，不走 adb）
+    # 2. 直接读 /sdcard 文件（Termux 有 external storage 权限），压缩为 JPEG，无需 adb pull
     log("  压缩截图...")
-    compress = subprocess.run(
-        f'python3 -c "from PIL import Image; '
-        f'img=Image.open(\'{remote_png}\').convert(\'RGB\'); '
-        f'img.save(\'{remote_jpg}\', \'JPEG\', quality=70)"',
-        shell=True, capture_output=True, timeout=15
-    )
-    if compress.returncode == 0:
-        pull_src, pull_local, name = remote_jpg, local_jpg, name_jpg
-        root_shell(f'rm -f {remote_png}')
+    try:
+        from PIL import Image
+        img = Image.open(remote_png).convert('RGB')
+        img.save(local, 'JPEG', quality=70)
         log("  压缩成功（JPEG quality=70）")
-    else:
-        log(f"  压缩失败（{compress.stderr.decode().strip()}），使用原始 PNG")
-        pull_src, pull_local = remote_png, local
-
-    # 3. adb pull 压缩后的文件
-    r = subprocess.run(f'{ADB} pull {pull_src} {pull_local}',
-                       shell=True, capture_output=True, timeout=30)
-    root_shell(f'rm -f {pull_src}')
-    if r.returncode != 0 or not os.path.exists(pull_local) or os.path.getsize(pull_local) < 1000:
-        log(f"ERROR: 截图失败: {r.stderr.decode()}")
+    except Exception as e:
+        log(f"ERROR: 截图读取/压缩失败: {e}")
         sys.exit(1)
-    local = pull_local
+    finally:
+        shell(f'rm -f {remote_png}')
 
     r = subprocess.run(
         f"scp -o StrictHostKeyChecking=no {local} {CLOUD}:{PHOTO_DIR}/{name}",

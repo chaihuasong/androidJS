@@ -16,6 +16,7 @@ echo "Acquiring wakelock..."
 termux-wake-lock 2>/dev/null || true
 echo "Wakelock acquired."
 
+
 # Kill any existing session
 tmux kill-session -t "$SESSION_NAME" 2>/dev/null || true
 
@@ -43,6 +44,4 @@ echo ""
 echo "  Local UI: http://localhost:$GATEWAY_PORT"
 echo "  Remote:   http://114.55.130.197:28790"
 echo ""
-
-# Attach to the session
-tmux attach -t "$SESSION_NAME"
+echo "  查看日志: tmux attach -t $SESSION_NAME"

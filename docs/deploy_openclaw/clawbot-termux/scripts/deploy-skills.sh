@@ -28,15 +28,16 @@ push_skill() {
 }
 
 # ── Skills ───────────────────────────────────────────────────────────────────
-push_skill "xhs-post"
 push_skill "split-open"
 push_skill "ui-control"
 push_skill "screenshot"
+push_skill "adb-shell"
 
 echo ""
 echo "完成！已部署："
-echo "  ~/.openclaw/workspace/skills/xhs-post/SKILL.md  +  ~/xhs-post.py"
 echo "  ~/.openclaw/workspace/skills/split-open/SKILL.md  +  ~/split-open.py"
 echo "  ~/.openclaw/workspace/skills/ui-control/SKILL.md  +  ~/ui-control.py"
+echo "  ~/.openclaw/workspace/skills/screenshot/SKILL.md"
+echo "  ~/.openclaw/workspace/skills/adb-shell/SKILL.md"
 echo ""
 echo "重启 ClawBot 后生效（skills 支持热加载，也可直接使用）。"
