@@ -122,7 +122,7 @@ def reconnect_adb():
 
 # ── uiautomator dump ──────────────────────────────────────────────────────────
 
-_DUMP_LOCK = '/data/local/tmp/.uictl_dump.lock'
+_DUMP_LOCK = '/data/data/com.termux/files/usr/tmp/.uictl_dump.lock'
 
 def dump_ui(retries=3):
     """
@@ -148,7 +148,7 @@ def _dump_ui_inner(retries=3):
             # 写到 /data/local/tmp（tmpfs，比 /sdcard 快），然后 cat+sed 一次读回
             # sed 剥离无用属性（减少 ~50% 体积），保留: text content-desc hint
             #   resource-id clickable long-clickable bounds
-            _UI_TMP = '/data/local/tmp/ui_dump.xml'
+            _UI_TMP = '/data/data/com.termux/files/usr/tmp/ui_dump.xml'
             _strip = (
                 "sed -e 's/ index=\"[^\"]*\"//g'"
                 " -e 's/ package=\"[^\"]*\"//g'"

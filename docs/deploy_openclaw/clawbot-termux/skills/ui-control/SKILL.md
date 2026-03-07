@@ -84,13 +84,13 @@ $PYTHON $SCRIPT tap-re "微信"   # 如果在桌面找得到图标
 
 # 方法2：adb 命令启动（App 不在当前屏幕时）
 # 微信
-adb -H 127.0.0.1 -P 5555 shell am start -n com.tencent.mm/.ui.LauncherUI
+/data/data/com.termux/files/usr/bin/adb shell am start -n com.tencent.mm/.ui.LauncherUI
 # 支付宝
-adb -H 127.0.0.1 -P 5555 shell am start -n com.eg.android.AlipayGphone/.AlipayLogin
+/data/data/com.termux/files/usr/bin/adb shell am start -n com.eg.android.AlipayGphone/.AlipayLogin
 # 设置
-adb -H 127.0.0.1 -P 5555 shell am start -a android.settings.SETTINGS
+/data/data/com.termux/files/usr/bin/adb shell am start -a android.settings.SETTINGS
 # 浏览器（通用）
-adb -H 127.0.0.1 -P 5555 shell am start -a android.intent.action.VIEW -d "https://example.com"
+/data/data/com.termux/files/usr/bin/adb shell am start -a android.intent.action.VIEW -d "https://example.com"
 
 # 方法3：回到桌面后找图标
 $PYTHON $SCRIPT key home

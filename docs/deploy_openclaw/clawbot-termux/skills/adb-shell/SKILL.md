@@ -1,6 +1,6 @@
 ---
 name: adb-shell
-description: "Execute any adb shell command on the phone with root privileges via TCP loopback. Use for: opening apps (am start), confirming dialogs, pressing hardware buttons, checking running processes (ps/dumpsys), reading system properties (getprop), managing packages (pm), sending intents (am broadcast), checking network state, or any system-level operation not covered by other skills."
+description: "Execute any adb shell command on the phone. Use for: opening apps (am start), confirming dialogs, pressing hardware buttons, checking running processes (ps/dumpsys), reading system properties (getprop), managing packages (pm), sending intents (am broadcast), checking network state, or any system-level operation not covered by other skills."
 metadata:
   {
     "openclaw":
@@ -13,13 +13,12 @@ metadata:
 
 # ADB Shell — ClawBot
 
-通过 adb TCP loopback（root 权限）执行任意 Android shell 命令。
+执行 Android shell 命令。adb 自动连接本机设备（`emulator-5554`），**无需任何 `-H`、`-P`、`-s` 参数**。
 
+命令格式（固定，不要修改）：
 ```
-ADB=/data/data/com.termux/files/usr/bin/adb
+/data/data/com.termux/files/usr/bin/adb shell <cmd>
 ```
-
-adb 默认连接 `emulator-5554`（本地 transport，无需额外配置），以下示例均使用 `$ADB shell <cmd>` 形式，简写为 `adb <cmd>`。
 
 ---
 
@@ -29,78 +28,78 @@ adb 默认连接 `emulator-5554`（本地 transport，无需额外配置），�
 
 ```bash
 # 通过包名/Activity 启动
-$ADB shell am start -n com.tencent.mm/.ui.LauncherUI          # 微信
-$ADB shell am start -n com.eg.android.AlipayGphone/.AlipayLogin  # 支付宝
-$ADB shell am start -n com.taobao.taobao/.main.MainActivity   # 淘宝
-$ADB shell am start -a android.settings.SETTINGS              # 系统设置
-$ADB shell am start -a android.intent.action.VIEW -d "https://example.com"  # 浏览器打开URL
+/data/data/com.termux/files/usr/bin/adb shell am start -n com.tencent.mm/.ui.LauncherUI          # 微信
+/data/data/com.termux/files/usr/bin/adb shell am start -n com.eg.android.AlipayGphone/.AlipayLogin  # 支付宝
+/data/data/com.termux/files/usr/bin/adb shell am start -n com.taobao.taobao/.main.MainActivity   # 淘宝
+/data/data/com.termux/files/usr/bin/adb shell am start -a android.settings.SETTINGS              # 系统设置
+/data/data/com.termux/files/usr/bin/adb shell am start -a android.intent.action.VIEW -d "https://example.com"  # 浏览器打开URL
 
 # 只知道包名时（跳转默认入口）
-$ADB shell monkey -p com.tencent.mm -c android.intent.category.LAUNCHER 1
+/data/data/com.termux/files/usr/bin/adb shell monkey -p com.tencent.mm -c android.intent.category.LAUNCHER 1
 ```
 
 ### 确认/关闭弹窗
 
 ```bash
 # 回车确认（等价于 ui-control key enter）
-$ADB shell input keyevent 66
+/data/data/com.termux/files/usr/bin/adb shell input keyevent 66
 
 # 点击坐标（当 ui-control tap-re 找不到元素时）
-$ADB shell input tap 540 1200
+/data/data/com.termux/files/usr/bin/adb shell input tap 540 1200
 
 # 返回键关闭弹窗
-$ADB shell input keyevent 4
+/data/data/com.termux/files/usr/bin/adb shell input keyevent 4
 ```
 
 ### 查看当前 App / Activity
 
 ```bash
 # 当前前台 Activity（确认在哪个页面）
-$ADB shell dumpsys activity activities | grep -E 'mResumedActivity|topActivity'
+/data/data/com.termux/files/usr/bin/adb shell dumpsys activity activities | grep -E 'mResumedActivity|topActivity'
 
 # 当前前台包名（简洁）
-$ADB shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
+/data/data/com.termux/files/usr/bin/adb shell dumpsys window | grep -E 'mCurrentFocus|mFocusedApp'
 ```
 
 ### 包管理
 
 ```bash
 # 查找已安装 App 的包名
-$ADB shell pm list packages | grep wechat
-$ADB shell pm list packages -3          # 只列第三方 App
+/data/data/com.termux/files/usr/bin/adb shell pm list packages | grep wechat
+/data/data/com.termux/files/usr/bin/adb shell pm list packages -3          # 只列第三方 App
 
 # 查询 App 主 Activity（用于 am start -n）
-$ADB shell cmd package resolve-activity --brief com.tencent.mm
+/data/data/com.termux/files/usr/bin/adb shell cmd package resolve-activity --brief com.tencent.mm
 ```
 
 ### 系统信息
 
 ```bash
 # 设备属性
-$ADB shell getprop ro.product.model
-$ADB shell getprop ro.build.version.release
+/data/data/com.termux/files/usr/bin/adb shell getprop ro.product.model
+/data/data/com.termux/files/usr/bin/adb shell getprop ro.build.version.release
 
 # 屏幕分辨率
-$ADB shell wm size
+/data/data/com.termux/files/usr/bin/adb shell wm size
 
 # 运行中的进程
-$ADB shell ps -A | grep tencent
+/data/data/com.termux/files/usr/bin/adb shell ps -A | grep tencent
 ```
 
 ### 发送 Intent / 广播
 
 ```bash
 # 打开通知栏
-$ADB shell cmd statusbar expand-notifications
+/data/data/com.termux/files/usr/bin/adb shell cmd statusbar expand-notifications
 
 # 收起通知栏
-$ADB shell cmd statusbar collapse
+/data/data/com.termux/files/usr/bin/adb shell cmd statusbar collapse
 
 # 亮屏
-$ADB shell input keyevent 224
+/data/data/com.termux/files/usr/bin/adb shell input keyevent 224
 
 # 熄屏
-$ADB shell input keyevent 223
+/data/data/com.termux/files/usr/bin/adb shell input keyevent 223
 ```
 
 ---
