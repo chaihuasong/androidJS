@@ -137,6 +137,18 @@ def cmd_dump():
         log("屏幕无可识别元素")
 
 
+def dump_summary(root):
+    """输出 tap 后屏幕摘要，供 Agent 验证是否进入正确页面。"""
+    nodes = all_nodes(root)
+    texts = []
+    for n in nodes:
+        t = n.get('text', '').strip()
+        d = n.get('content-desc', '').strip()
+        if t: texts.append(f'"{t}"')
+        elif d: texts.append(f'"{d}"')
+    log(f"  [tap后屏幕] {', '.join(texts[:15])}" + (" ..." if len(texts) > 15 else ""))
+
+
 def cmd_tap(text):
     log(f"查找并点击: \"{text}\"")
     root = dump_ui()
@@ -151,6 +163,10 @@ def cmd_tap(text):
         sys.exit(1)
     log(f"  找到: text=\"{node.get('text','')}\" bounds={node.get('bounds','')}")
     tap_xy(*c)
+    # tap 后自动 dump，输出当前屏幕摘要供 Agent 验证
+    after = dump_ui()
+    if after:
+        dump_summary(after)
     log("OK")
 
 
@@ -168,6 +184,9 @@ def cmd_tap_id(res_id):
         sys.exit(1)
     log(f"  找到: id=\"{node.get('resource-id','')}\" bounds={node.get('bounds','')}")
     tap_xy(*c)
+    after = dump_ui()
+    if after:
+        dump_summary(after)
     log("OK")
 
 

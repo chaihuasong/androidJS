@@ -1,27 +1,27 @@
 ---
 name: screenshot
-description: "Take a screenshot of the phone screen and display it in chat. Use when asked to: take a screenshot, capture the screen, show what's on screen, screenshot the current app, or share screen content."
+description: "Capture the phone SCREEN or record screen video and show it in chat. Use when asked to: take a screenshot, capture the screen, show what's on screen, screenshot the current app, record screen, screen recording, record a video of the screen. DO NOT use this for taking photos with the camera — use termux-camera-photo for that instead."
 metadata:
   {
     "openclaw":
       {
         "emoji": "📸",
-        "requires": { "bins": ["screencap", "scp"] },
+        "requires": { "bins": ["adb", "scp"] },
       },
   }
 ---
 
 # Screenshot — ClawBot
 
-Capture the phone screen via `screencap` and upload to the cloud server for display in chat.
+截取手机**屏幕画面**（不是相机拍照）并上传到云端在聊天中显示。
+
+**重要：这是屏幕截图，不是相机拍照。拍照请用 `termux-camera-photo`。**
 
 ## How It Works
 
 ```
-screencap → $TMPDIR/screenshot.png → SCP → Cloud /var/www/clawbot-photos/ → Browser
+adb exec-out screencap -p → $TMPDIR/screenshot.png → SCP → Cloud /var/www/clawbot-photos/ → Browser
 ```
-
-`screencap` is a built-in Android tool — no Termux:API or extra permissions needed.
 
 ## Take and Display a Screenshot
 
@@ -64,6 +64,33 @@ for i in 1 2 3; do
     && rm -f "$SS_PATH"
 done
 ```
+
+## Screen Recording（录屏）
+
+录制屏幕 N 秒后上传到云端：
+
+```bash
+CLOUD="root@114.55.130.197"
+PHOTO_DIR="/var/www/clawbot-photos"
+BASE_URL="http://114.55.130.197:28790/photos"
+SECONDS=10   # 录制时长（秒），最长180
+TS=$(date +%Y%m%d-%H%M%S)
+VID_NAME="screenrecord-$TS.mp4"
+VID_DEVICE="/sdcard/$VID_NAME"
+VID_LOCAL="$TMPDIR/$VID_NAME"
+
+# 录制（adb shell 后台跑，sleep 等待完成）
+adb shell "screenrecord --time-limit $SECONDS $VID_DEVICE" \
+  && adb pull "$VID_DEVICE" "$VID_LOCAL" \
+  && adb shell "rm -f $VID_DEVICE" \
+  && echo "Recorded: $(du -sh $VID_LOCAL | cut -f1)" \
+  && scp -o StrictHostKeyChecking=no "$VID_LOCAL" "$CLOUD:$PHOTO_DIR/$VID_NAME" \
+  && ssh -o StrictHostKeyChecking=no "$CLOUD" "chmod 644 $PHOTO_DIR/$VID_NAME" \
+  && echo "[$VID_NAME]($BASE_URL/$VID_NAME)" \
+  && rm -f "$VID_LOCAL"
+```
+
+> `--time-limit` 最大 180 秒。录制期间手机屏幕需亮屏。
 
 ## Guidelines
 
