@@ -217,12 +217,38 @@ while true; do
   # 清理服务器上可能僵尸占着端口的旧 sshd（否则 ExitOnForwardFailure 会立即退出）
   ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no root@114.55.130.197 "fuser -k 28789/tcp 2>/dev/null; true" 2>/dev/null || true
   echo "$(date): Starting SSH tunnel..."
-  ssh -o ServerAliveInterval=30 -o ServerAliveCountMax=3 \
+  ssh -o ServerAliveInterval=3 -o ServerAliveCountMax=5 \
       -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no \
       -o TCPKeepAlive=yes -o ConnectTimeout=10 \
       -R 28789:127.0.0.1:28789 root@114.55.130.197 -N
   echo "$(date): Tunnel died (exit=$?). Restarting in 3s..."
   sleep 3
+done
+```
+
+**`~/watchdog.sh`**（可选：网络活跃探针，防止 USF 判定流量为零）
+```bash
+#!/data/data/com.termux/files/usr/bin/bash
+# 保持少量 TCP 流量，防止 XOS USF Hiber 将 Termux 标记为 speed=0 后冻结
+( while true; do
+    curl -s --max-time 1 http://114.55.130.197:28790/ -o /dev/null 2>/dev/null || true
+    sleep 2
+  done ) &
+TCP_KEEPALIVE_PID=$!
+echo "TCP keepalive started (pid=$TCP_KEEPALIVE_PID)"
+wait
+```
+
+**`~/diag.sh`**（诊断：实时监控 gateway/隧道/网络状态）
+```bash
+#!/data/data/com.termux/files/usr/bin/bash
+LOG="$HOME/diag.log"
+while true; do
+  GW=$(pgrep -f openclaw-gateway | wc -l | tr -d ' ')
+  SSH=$(pgrep -f 'ssh.*28789' | wc -l | tr -d ' ')
+  if ping -c1 -W2 8.8.8.8 &>/dev/null; then NET="ok"; else NET="FAIL"; fi
+  echo "$(date '+%H:%M:%S') gw=$GW ssh=$SSH net=$NET" | tee -a "$LOG"
+  sleep 15
 done
 ```
 
@@ -232,6 +258,76 @@ done
 ```bash
 bash ~/clawbot-launch.sh
 ```
+
+---
+
+## 2.5 Infinix XOS USF 后台冻结修复（需 root）
+
+### 问题根因
+
+Infinix XOS 内置 **USF（Unified Service Framework）** 的 `hiber` 模块，在 App 退到后台约 5 秒后检测流量为零（`isTrafficActive uid:10231 speed:0`），随即调用 `netd destroyNetworkByUid` 销毁该 UID 的所有 TCP socket，导致 SSH 隧道断开。
+
+logcat 关键日志：
+```
+Usf_Hiber: isTrafficActive uid:10231 speed:0
+UsfSystemServer/TranUsfAppInternal: begin destroyNetworkByUid, mUid: 10231
+Netd: Destroyed 2 sockets for uids{ 10231 }
+```
+
+### 一次性修复步骤（需 root）
+
+```bash
+# 1. 拉取系统 hiber 白名单配置
+adb shell "su -c 'cat /system_ext/etc/vconfig/tranusf/config/hiber/hiber.json'" > /tmp/hiber.json
+
+# 2. 在 whitePackages 数组中添加 Termux 包名（用文本编辑器编辑 /tmp/hiber.json）
+#    在 "com.transsion.airtransfer" 之后添加：
+#    "com.termux",
+#    "com.termux.api",
+#    "com.termux.gui"
+
+# 3. 推送到手机
+adb push /tmp/hiber.json /data/local/tmp/hiber_minimal.json
+
+# 4. Bind mount 覆盖系统只读文件（不修改系统分区，绕过 dm-verity）
+adb shell "su -c 'mount --bind /data/local/tmp/hiber_minimal.json /system_ext/etc/vconfig/tranusf/config/hiber/hiber.json'"
+
+# 5. 重启 hiber 守护进程让其重新读取配置
+adb shell "su -c 'stop hiber && sleep 1 && start hiber && sleep 3'"
+
+# 6. 重启 USF Java App 让其内存中的配置也更新
+adb shell "su -c 'kill -9 \$(pgrep -f com.transsion.usf | head -1)'"
+
+# 验证：查看 Termux 是否从冻结列表移除
+adb shell "su -c 'dumpsys activity service com.transsion.usf/.UsfMainService -ability -hiber'"
+# 期望输出：isEnabled=false, frozenList: size=0
+```
+
+> **注意**：bind mount 重启手机后失效，需配合 Magisk 模块实现开机自动恢复（见下方）。
+
+### 持久化：Magisk 模块
+
+模块文件位于源码仓库 `scripts/usf-fix/`，已推送到手机路径 `/data/adb/modules/usf_termux_whitelist/`。
+
+**部署 Magisk 模块：**
+```bash
+# 在 Mac/PC 上执行（adb 连接手机）
+adb shell "su -c 'mkdir -p /data/adb/modules/usf_termux_whitelist'"
+
+adb push scripts/usf-fix/module.prop /tmp/module.prop
+adb shell "su -c 'cp /tmp/module.prop /data/adb/modules/usf_termux_whitelist/module.prop'"
+
+adb push scripts/usf-fix/service.sh /tmp/service.sh
+adb shell "su -c 'cp /tmp/service.sh /data/adb/modules/usf_termux_whitelist/service.sh && chmod 755 /data/adb/modules/usf_termux_whitelist/service.sh'"
+```
+
+**`service.sh` 工作原理：**
+- 开机 30 秒后执行（等待系统就绪）
+- 将 `/data/local/tmp/hiber_minimal.json`（含 Termux 白名单的补丁配置）bind mount 到系统路径
+- 重启 hiber 守护进程 + kill USF App，使配置生效
+- 每次重启手机自动执行，无需手动操作
+
+**前提：** `/data/local/tmp/hiber_minimal.json` 必须存在（参照上方步骤 1-3 生成）。
 
 ---
 
@@ -252,6 +348,8 @@ bash ~/clawbot-launch.sh
 | 502 Bad Gateway（隧道起不来）| 服务器旧 sshd 进程僵尸占着端口 28789 | `ssh root@服务器 "fuser -k 28789/tcp"` 清理后隧道自动重连 |
 | Tool 调用过程看不到 / 消息不刷新 | Control UI 不自动刷新，需手动点右上角刷新按钮 | 部署 `control-ui-patch/patch.js`（见下方章节），agent 运行期间每5秒自动点刷新 |
 | Agent session 卡死不回复 | DeepSeek 流式请求挂起（`tool_stream:true` 引起）| 将 `tool_stream` 设为 `false`，重启 openclaw |
+| SSH 隧道后台断开（5 秒）| Infinix XOS USF Hiber 模块检测 uid=10231 流量为零，调用 `netd destroyNetworkByUid` 销毁所有 TCP socket | root 修复：bind mount 补丁版 `hiber.json`（含 com.termux 白名单）→ 重启 hiber + USF app；用 Magisk 模块实现开机持久化（见 §2.5）|
+| bind mount 重启后失效 | Android 重启会恢复 tmpfs/overlayfs 状态 | 安装 Magisk 模块 `usf_termux_whitelist`，`service.sh` 每次开机自动重新应用 bind mount |
 
 ---
 
@@ -277,6 +375,11 @@ bash ~/clawbot-launch.sh
 | 源码仓库 | `deploy/clawbot-termux/` | 所有部署文件的备份 |
 | 源码仓库 | `control-ui-patch/patch.js` | Control UI 补丁源文件 |
 | 源码仓库 | `control-ui-patch/apply-patch.sh` | 一键推送补丁到手机的脚本 |
+| 手机 | `~/watchdog.sh` | 持续发 HTTP 请求保持 TCP 流量，防止 USF 判定流量为零 |
+| 手机 | `~/diag.sh` | 实时监控 gateway 进程 / SSH 隧道 / 网络状态 |
+| 手机 | `/data/local/tmp/hiber_minimal.json` | 含 Termux 白名单的 USF Hiber 补丁配置 |
+| 源码仓库 | `scripts/usf-fix/module.prop` | Magisk 模块元数据 |
+| 源码仓库 | `scripts/usf-fix/service.sh` | Magisk 模块 boot 脚本（重新应用 bind mount + 重启 hiber/USF）|
 
 ---
 

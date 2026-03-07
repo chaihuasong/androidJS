@@ -1,0 +1,6 @@
+id=usf_termux_whitelist
+name=USF Termux Whitelist
+version=v1
+versionCode=1
+author=ClawBot
+description=Prevents Infinix XOS USF from freezing Termux background TCP connections (destroyNetworkByUid fix)
