@@ -7,7 +7,10 @@ Usage: split-open.py "App Name"
 Example: split-open.py "小红书"
          split-open.py "微信"
 """
-import subprocess, time, sys, re
+import subprocess, time, sys, re, os
+
+# Android 系统命令在 /system/bin，Termux 的 PATH 默认不含此路径
+os.environ['PATH'] = '/system/bin:/system/xbin:' + os.environ.get('PATH', '')
 
 APP_NAME = sys.argv[1] if len(sys.argv) > 1 else None
 
@@ -80,15 +83,15 @@ def find_package(app_name):
 
 
 def get_main_activity(pkg):
-    """Get main launcher activity for package."""
-    out = run(
-        f"cmd package resolve-activity --brief "
-        f"-c android.intent.category.LAUNCHER {pkg}"
-    )
-    for line in out.split('\n'):
-        line = line.strip()
-        if '/' in line and not line.startswith(('No activity', 'Warning', 'Unable')):
-            return line
+    """从 dumpsys package 找到真实 Launcher Activity（兼容隐藏 intent-filter 的应用）。"""
+    out = run(f"dumpsys package {pkg}", timeout=20)
+    lines = out.split('\n')
+    for i, line in enumerate(lines):
+        if 'android.intent.action.MAIN' in line:
+            for j in list(range(i-1, max(i-6,0), -1)) + list(range(i+1, min(i+6,len(lines)))):
+                m = re.search(rf'{re.escape(pkg)}/(\S+Activity\S*)', lines[j])
+                if m:
+                    return f"{pkg}/{m.group(1).rstrip(':')}"
     return None
 
 
