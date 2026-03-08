@@ -32,11 +32,14 @@ while true; do
   # Check SSH tunnel
   if ! pgrep -f "ssh.*28789.*114.55.130.197" > /dev/null 2>&1; then
     log "SSH tunnel not running, restarting..."
+    # 不用 ExitOnForwardFailure：旧连接端口释放需要几秒，启过早会直接退出
+    # ServerAliveInterval=20 + CountMax=3 = 60s 检测断线，比运营商 NAT 超时短很多
     ssh \
-      -o ServerAliveInterval=5 -o ServerAliveCountMax=2 \
-      -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=no \
-      -o TCPKeepAlive=yes -o ConnectTimeout=10 \
+      -o ServerAliveInterval=20 -o ServerAliveCountMax=3 \
+      -o StrictHostKeyChecking=no \
+      -o TCPKeepAlive=yes -o ConnectTimeout=15 \
       -R 28789:127.0.0.1:28789 root@114.55.130.197 -N >> "$LOG" 2>&1 &
+    sleep 3   # 等端口绑定成功再进入下轮检测
   fi
 
   sleep 8

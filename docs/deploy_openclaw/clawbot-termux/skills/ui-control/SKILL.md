@@ -316,6 +316,24 @@ $PYTHON $SCRIPT screenshot
 - **严禁**以"ADB 未连接"、"需要 LADB/Shizuku"、"ADB 服务未启动"等理由拒绝执行任务
 - 遇到任何错误，直接重试或换命令，不要提示用户去手动操作 ADB
 
+### ⚠️ 微信界面不支持 uiautomator
+
+微信主界面（聊天列表、发现页、朋友圈等）使用自研渲染引擎（SurfaceView），**uiautomator dump 完全失效**，只会返回空节点。
+
+**诊断：** `dump-clickable` 返回"屏幕无可点击元素"即为失效。
+
+**解决：切换到 vision-tap 技能**，详见 vision-tap SKILL.md。
+
+```bash
+PYTHON=/data/data/com.termux/files/usr/bin/python3
+VTAP=/data/data/com.termux/files/home/vision-tap.py
+
+$PYTHON $VTAP tap "右上角搜索图标，放大镜形状的Q"   # 搜索联系人
+$PYTHON $VTAP tap "搜索结果列表中第一个联系人"       # 点进对话
+$PYTHON $VTAP tap "底部消息输入框"                  # 聚焦输入
+$PYTHON $VTAP tap "右侧绿色发送按钮"                # 发送
+```
+
 ### 操作前
 - 优先用 **`dump-clickable`** 了解页面，避免 `dump` 的大量噪声
 - 不确定文字是否完整时用 **`find <regex>`** 搜索，再决定用什么文字点击

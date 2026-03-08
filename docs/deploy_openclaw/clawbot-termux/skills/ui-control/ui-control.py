@@ -455,8 +455,10 @@ def cmd_tap_id(res_id):
     log("OK")
 
 
-_ADB_IME = 'com.android.adbkeyboard/.AdbIME'
-_ADB_BIN = '/data/data/com.termux/files/usr/bin/adb'
+_ADB_IME    = 'com.android.adbkeyboard/.AdbIME'
+_ADB_BIN    = '/data/data/com.termux/files/usr/bin/adb'
+_PYTHON_BIN = '/data/data/com.termux/files/usr/bin/python3'
+_VISION_TAP = '/data/data/com.termux/files/home/vision-tap.py'
 
 def _adb(cmd, timeout=8):
     """通过 adb shell 执行命令（走 emulator-5554 本地 transport）。"""
@@ -467,68 +469,114 @@ def _get_current_ime():
     """获取当前默认输入法 ID。"""
     return _adb('settings get secure default_input_method', timeout=5).strip()
 
-def _paste_fallback(text):
+def _vision_tap(description):
+    """调用 vision-tap.py，自动传入正确的 HOME 环境变量。"""
+    env = os.environ.copy()
+    env['HOME'] = '/data/data/com.termux/files/home'
+    return subprocess.run(
+        [_PYTHON_BIN, _VISION_TAP, 'tap', description],
+        timeout=45, env=env
+    )
+
+
+def _clipboard_paste(text):
     """
-    剪贴板粘贴兜底：适用于自定义编辑器（如小红书）不响应 ADBKeyBoard broadcast 的情况。
-    termux-clipboard-set 写入系统剪贴板 → KEYCODE_PASTE 触发粘贴。
+    整段写入剪贴板 → vision-tap 点击键盘工具栏剪贴板图标（📋）→ 降级 KEYCODE_PASTE。
+
+    调用前确保当前输入法是用户的原始输入法（非 ADBKeyBoard），
+    这样键盘工具栏才会显示剪贴板图标。
     """
-    log("  [兜底] 剪贴板粘贴...")
+    log("  [剪贴板粘贴] 写入剪贴板...")
     safe = text.replace("'", "'\\''")
     subprocess.run(f"termux-clipboard-set '{safe}'",
                    shell=True, capture_output=True, timeout=10)
-    time.sleep(0.5)
-    _adb('input keyevent 279', timeout=5)  # KEYCODE_PASTE
-    log("OK (clipboard)")
+    time.sleep(0.8)  # 等键盘工具栏刷新出剪贴板图标
+
+    log("  [vision-tap] 点击键盘工具栏剪贴板图标...")
+    r = _vision_tap('键盘工具栏里的剪贴板图标📋')
+    if r.returncode == 0:
+        log("OK (clipboard icon)")
+        return
+
+    log("  vision-tap 失败，降级到 KEYCODE_PASTE...")
+    _adb('input keyevent 279', timeout=5)
+    log("OK (clipboard keyevent)")
+
+
+def _type_ascii_segment(text):
+    """
+    输入纯 ASCII 单段（不含换行）。
+    返回 True=成功，False=需要调用方走剪贴板兜底。
+    """
+    android_safe = text.replace("'", "'\\''")
+    r = subprocess.run(
+        [_ADB_BIN, 'shell', f"input text '{android_safe}'"],
+        capture_output=True, text=True, timeout=8
+    )
+    return r.returncode == 0
+
+
+def _has_emoji(text):
+    """
+    检测文字中是否含有 Emoji 或非 CJK 特殊符号。
+    这类字符无法通过 ADBKeyBoard broadcast 输入，必须走剪贴板。
+
+    "安全"范围（broadcast 可处理）：ASCII + CJK 汉字/符号/标点/全角字符。
+    其余（Emoji、杂项符号、变体选择符等）均认为不安全。
+    """
+    for c in text:
+        cp = ord(c)
+        if cp < 128:
+            continue  # ASCII
+        # CJK 相关块（broadcast 可处理）
+        if (0x2E80 <= cp <= 0x2EFF   # CJK 部首补充
+                or 0x3000 <= cp <= 0x9FFF   # CJK 符号标点 + 平假名 + 片假名 + CJK统一汉字
+                or 0xAC00 <= cp <= 0xD7AF   # 韩文音节
+                or 0xF900 <= cp <= 0xFAFF   # CJK 兼容汉字
+                or 0xFF01 <= cp <= 0xFF60   # 全角字符
+                or 0x20000 <= cp <= 0x2A6DF):  # CJK 扩展B
+            continue
+        # 其余非 ASCII 字符：Emoji、杂项符号、变体选择符等
+        return True
+    return False
+
+
+def _type_nonascii_segment(text, prev_ime):
+    """
+    通过 ADBKeyBoard broadcast 输入含中文的单段（不含换行）。
+    调用前需已切换到 ADBKeyBoard，切回由调用方负责。
+    返回 True=成功，False=需要调用方走剪贴板兜底。
+
+    注意：含 Emoji/特殊符号的文字直接返回 False（由调用方走剪贴板），
+    因为 ADBKeyBoard 无法输入 Emoji，broadcast 会静默失败。
+    """
+    if _has_emoji(text):
+        log("  含 Emoji/特殊符号，跳过 broadcast，走剪贴板兜底")
+        return False
+    escaped = text.replace('\\', '\\\\').replace('"', '\\"')
+    out = _adb(f'am broadcast -a ADB_INPUT_TEXT --es msg "{escaped}"', timeout=5)
+    time.sleep(0.3)
+    return 'result=-1' in out
 
 
 def cmd_type(text):
     """
-    输入文字。三级降级策略：
-    - 纯 ASCII：adb shell input text；失败则走剪贴板兜底。
-    - 含中文/特殊字符：切 ADBKeyBoard → broadcast；broadcast 无有效接收者则走剪贴板兜底。
-      （兜底覆盖小红书等自定义编辑器不响应 ADBKeyBoard broadcast 的情况）
-      ADBKeyBoard broadcast 必须走 adb shell（不能用 su），否则无法触发输入法接收。
+    输入文字（支持中文、Emoji、换行）。
+
+    策略：整段写入剪贴板 → vision-tap 点击键盘工具栏剪贴板图标（📋）粘贴。
+    比逐字符输入更可靠，且天然支持 Emoji、换行、特殊符号。
+    若 vision-tap 失败，降级到 KEYCODE_PASTE (279)。
     """
     log(f"输入文字: \"{text}\"")
-    is_ascii = all(ord(c) < 128 for c in text)
 
-    if is_ascii:
-        # 用单引号在 Android shell 层包裹文字，避免空格/特殊字符被 shell 拆分。
-        # 使用 list 参数（不经本地 shell），单引号原样传到 Android shell 层再解析。
-        # 文字中含单引号时用 '\'' 处理（结束引号→转义单引号→重开引号）。
-        android_safe = text.replace("'", "'\\''")
-        r = subprocess.run(
-            [_ADB_BIN, 'shell', f"input text '{android_safe}'"],
-            capture_output=True, text=True, timeout=8
-        )
-        if r.returncode == 0:
-            log("OK")
-            return
-        log(f"  input text 失败（rc={r.returncode}），走剪贴板兜底")
-        _paste_fallback(text)
-        return
+    # 确保当前不是 ADBKeyBoard（ADBKeyBoard 没有剪贴板工具栏图标）
+    current_ime = _get_current_ime()
+    if current_ime == _ADB_IME:
+        _adb('ime reset', timeout=5)
+        log("  切回默认输入法（ADBKeyBoard 无剪贴板工具栏）")
+        time.sleep(0.5)
 
-    # 含中文：切 ADBKeyBoard，完成后切回
-    prev_ime = _get_current_ime()
-    log(f"  切换输入法: {prev_ime or '未知'} → ADBKeyBoard")
-    _adb(f'ime set {_ADB_IME}', timeout=5)
-    time.sleep(0.3)
-
-    escaped = text.replace('\\', '\\\\').replace('"', '\\"')
-    out = _adb(f'am broadcast -a ADB_INPUT_TEXT --es msg "{escaped}"', timeout=5)
-    time.sleep(0.3)
-
-    if prev_ime and prev_ime != _ADB_IME:
-        _adb(f'ime set {prev_ime}', timeout=5)
-        log(f"  恢复输入法: {prev_ime}")
-
-    # result=-1 表示 ADBKeyBoard 成功接收并处理了 broadcast
-    if 'result=-1' in out:
-        log("OK")
-        return
-
-    log(f"  broadcast 无有效接收者（{out.strip()}），走剪贴板兜底")
-    _paste_fallback(text)
+    _clipboard_paste(text)
 
 
 def cmd_swipe(direction):
