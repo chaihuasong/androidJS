@@ -187,6 +187,7 @@ $PYTHON $SCRIPT dump
 # 正则点击（推荐）：大小写不敏感，支持 | 多选
 $PYTHON $SCRIPT tap-re "发布|Post"
 $PYTHON $SCRIPT tap-re "^下一步$"         # 精确匹配"下一步"
+$PYTHON $SCRIPT tap-re "^X$"             # 精确匹配"X"（避免误点 XClub/Xbox）
 $PYTHON $SCRIPT tap-re "关闭|×|✕"
 
 # 子串点击（精确文字）
@@ -272,7 +273,10 @@ $PYTHON $SCRIPT screenshot
 ### 点击
 - 优先用 **`tap-re`**，它支持 `|` 多选、大小写不敏感、自动选可点击元素
 - 文字完全确定时用 `tap`，按 resource-id 时用 `tap-id`
-- `tap-re` 输出会标注 `[可点击]` 或 `[非clickable,坐标点击]`，后者成功率稍低
+- **单字或短名称必须加 `^` `$` 精确匹配**，否则会误命中含该字的其他元素
+  - ❌ `tap-re "X"` → 会匹配 XClub、Xbox 等
+  - ✅ `tap-re "^X$"` → 只匹配文字恰好是 "X" 的元素
+- `tap-re` 输出会标注 `[可点击]` 或 `[坐标点击]`，后者成功率稍低
 
 ### 点击后验证（必须执行）
 - 用 **`has <关键词>`** 快速验证是否进入正确页面
