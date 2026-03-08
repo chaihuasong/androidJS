@@ -1,6 +1,6 @@
 ---
 name: phone-control
-description: "Control Android phone hardware via Termux:API commands. Use when asked to: toggle flashlight, take photos, read sensors, make calls, send SMS, check battery, adjust brightness/volume, speak text aloud (TTS), vibrate phone, get GPS location, read clipboard, send notifications, check Wi-Fi, or read contacts. Requires Termux and Termux:API with granted permissions."
+description: "Control Android phone hardware via Termux:API commands. Use when asked to: toggle flashlight, take photos WITH THE CAMERA (NOT screenshots), read sensors, make calls, send SMS, check battery, adjust brightness/volume, speak text aloud (TTS), vibrate phone, get GPS location, read clipboard, send notifications, check Wi-Fi, or read contacts. DO NOT use this for screen capture — use the screenshot skill instead. Requires Termux and Termux:API with granted permissions."
 metadata:
   {
     "openclaw":

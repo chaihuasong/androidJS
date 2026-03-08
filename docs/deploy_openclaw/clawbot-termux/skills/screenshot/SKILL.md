@@ -1,6 +1,6 @@
 ---
 name: screenshot
-description: "Capture the phone SCREEN or record screen video and show it in chat. Use when asked to: take a screenshot, capture the screen, show what's on screen, screenshot the current app, record screen, screen recording, record a video of the screen. DO NOT use this for taking photos with the camera — use termux-camera-photo for that instead."
+description: "Capture the phone SCREEN (截图/截屏) or record screen video and show it in chat. Use when asked to: take a screenshot, capture the screen, show what's on screen, screenshot the current app, record screen, screen recording, record a video of the screen, 截图, 截屏, 看看屏幕, 屏幕录制. This captures what is DISPLAYED ON SCREEN — it is NOT a camera photo. DO NOT use this for taking photos with the camera (拍照/拍摄) — use the phone-control skill with termux-camera-photo for that instead."
 metadata:
   {
     "openclaw":

@@ -216,6 +216,44 @@ $PYTHON $SCRIPT tap-re "搜索|请输入"
 $PYTHON $SCRIPT type "要输入的内容"
 ```
 
+### 浏览列表 / 逐篇查看内容
+
+浏览信息流、搜索结果等列表时，**不能在同一位置反复 tap-re**，必须用"滚动 → 检查 → 点击 → 返回 → 继续滚动"循环：
+
+```bash
+# ── 标准列表浏览循环 ──────────────────────────────────────────
+
+# 1. 先截图了解当前屏幕，确认可见哪些文章
+$PYTHON $SCRIPT screenshot
+
+# 2. dump 读取当前可见文章的标题/摘要，判断是否是目标内容
+$PYTHON $SCRIPT dump
+
+# 3a. 若当前屏幕的文章符合目标 → 点击打开
+$PYTHON $SCRIPT tap-re "目标关键词"
+
+# 3b. 若不符合 → 向下滚动，让新的文章进入视野
+$PYTHON $SCRIPT swipe scroll-down
+
+# 4. 滚动后再次 dump / screenshot，判断新出现的内容
+#    重复步骤 2-3 直到找到目标
+
+# 5. 看完一篇文章后返回列表，页面会停在原来位置
+$PYTHON $SCRIPT key back
+
+# 6. 返回列表后必须先滚动，再找下一篇（否则 tap-re 会命中同一篇）
+$PYTHON $SCRIPT swipe scroll-down
+$PYTHON $SCRIPT dump   # 查看新出现的文章
+```
+
+**关键规则：**
+- 返回列表后**必须先 `swipe scroll-down`**，再执行下一次 tap，否则始终点击同一篇
+- 用 `dump`（而非 `dump-clickable`）读取文章标题，因为标题通常不是可点击元素
+- 记录已访问文章的标题关键词，用 `find "标题关键词"` 确认该文章还在屏幕上时跳过它
+- 若列表到底仍未找到目标，用 `scroll-to-top` 回顶后换关键词重新搜索
+
+---
+
 ### 滑动
 
 **注意方向语义（以手指移动方向为准，与内容滚动方向相反）：**
@@ -262,7 +300,7 @@ $PYTHON $SCRIPT screenshot
 ## Guidelines
 
 ### 环境说明（必读，禁止违反）
-- ADB 已通过 TCP loopback（127.0.0.1:5555）以 root 权限连接，**始终可用**
+- ADB 已有默认连接（emulator-5554 本地 transport），直接执行 adb 命令即可，**无需 adb connect**
 - **严禁**以"ADB 未连接"、"需要 LADB/Shizuku"、"ADB 服务未启动"等理由拒绝执行任务
 - 遇到任何错误，直接重试或换命令，不要提示用户去手动操作 ADB
 

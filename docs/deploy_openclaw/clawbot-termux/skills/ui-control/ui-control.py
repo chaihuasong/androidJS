@@ -467,20 +467,45 @@ def _get_current_ime():
     """获取当前默认输入法 ID。"""
     return _adb('settings get secure default_input_method', timeout=5).strip()
 
+def _paste_fallback(text):
+    """
+    剪贴板粘贴兜底：适用于自定义编辑器（如小红书）不响应 ADBKeyBoard broadcast 的情况。
+    termux-clipboard-set 写入系统剪贴板 → KEYCODE_PASTE 触发粘贴。
+    """
+    log("  [兜底] 剪贴板粘贴...")
+    safe = text.replace("'", "'\\''")
+    subprocess.run(f"termux-clipboard-set '{safe}'",
+                   shell=True, capture_output=True, timeout=10)
+    time.sleep(0.5)
+    _adb('input keyevent 279', timeout=5)  # KEYCODE_PASTE
+    log("OK (clipboard)")
+
+
 def cmd_type(text):
     """
-    输入文字。
-    - 纯 ASCII：adb shell input text 直接发，无需切换 IME。
-    - 含中文/特殊字符：记录当前 IME → 切 ADBKeyBoard → broadcast 发文字 → 切回原 IME。
+    输入文字。三级降级策略：
+    - 纯 ASCII：adb shell input text；失败则走剪贴板兜底。
+    - 含中文/特殊字符：切 ADBKeyBoard → broadcast；broadcast 无有效接收者则走剪贴板兜底。
+      （兜底覆盖小红书等自定义编辑器不响应 ADBKeyBoard broadcast 的情况）
       ADBKeyBoard broadcast 必须走 adb shell（不能用 su），否则无法触发输入法接收。
     """
     log(f"输入文字: \"{text}\"")
     is_ascii = all(ord(c) < 128 for c in text)
 
     if is_ascii:
-        safe = text.replace('\\', '\\\\').replace("'", "\\'")
-        _adb(f"input text '{safe}'", timeout=8)
-        log("OK")
+        # 用单引号在 Android shell 层包裹文字，避免空格/特殊字符被 shell 拆分。
+        # 使用 list 参数（不经本地 shell），单引号原样传到 Android shell 层再解析。
+        # 文字中含单引号时用 '\'' 处理（结束引号→转义单引号→重开引号）。
+        android_safe = text.replace("'", "'\\''")
+        r = subprocess.run(
+            [_ADB_BIN, 'shell', f"input text '{android_safe}'"],
+            capture_output=True, text=True, timeout=8
+        )
+        if r.returncode == 0:
+            log("OK")
+            return
+        log(f"  input text 失败（rc={r.returncode}），走剪贴板兜底")
+        _paste_fallback(text)
         return
 
     # 含中文：切 ADBKeyBoard，完成后切回
@@ -490,14 +515,20 @@ def cmd_type(text):
     time.sleep(0.3)
 
     escaped = text.replace('\\', '\\\\').replace('"', '\\"')
-    _adb(f'am broadcast -a ADB_INPUT_TEXT --es msg "{escaped}"', timeout=5)
+    out = _adb(f'am broadcast -a ADB_INPUT_TEXT --es msg "{escaped}"', timeout=5)
     time.sleep(0.3)
 
     if prev_ime and prev_ime != _ADB_IME:
         _adb(f'ime set {prev_ime}', timeout=5)
         log(f"  恢复输入法: {prev_ime}")
 
-    log("OK")
+    # result=-1 表示 ADBKeyBoard 成功接收并处理了 broadcast
+    if 'result=-1' in out:
+        log("OK")
+        return
+
+    log(f"  broadcast 无有效接收者（{out.strip()}），走剪贴板兜底")
+    _paste_fallback(text)
 
 
 def cmd_swipe(direction):
