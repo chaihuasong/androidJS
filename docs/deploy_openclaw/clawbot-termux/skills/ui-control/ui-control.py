@@ -487,20 +487,23 @@ def _clipboard_paste(text):
     这样键盘工具栏才会显示剪贴板图标。
     """
     log("  [剪贴板粘贴] 写入剪贴板...")
-    safe = text.replace("'", "'\\''")
-    subprocess.run(f"termux-clipboard-set '{safe}'",
-                   shell=True, capture_output=True, timeout=10)
+    safe = text.replace('"', '\\"')
+    _TERMUX_ENV = (
+        'export HOME=/data/data/com.termux/files/home; '
+        'export PREFIX=/data/data/com.termux/files/usr; '
+        'export PATH=$PREFIX/bin:$PATH; '
+        'export TMPDIR=$PREFIX/tmp'
+    )
+    subprocess.run(
+        f'{_TERMUX_ENV}; termux-clipboard-set "{safe}"',
+        shell=True, capture_output=True, timeout=10,
+        executable='/system/bin/sh'
+    )
     time.sleep(0.8)  # 等键盘工具栏刷新出剪贴板图标
 
-    log("  [vision-tap] 点击键盘工具栏剪贴板图标...")
-    r = _vision_tap('键盘工具栏里的剪贴板图标📋')
-    if r.returncode == 0:
-        log("OK (clipboard icon)")
-        return
-
-    log("  vision-tap 失败，降级到 KEYCODE_PASTE...")
-    _adb('input keyevent 279', timeout=5)
-    log("OK (clipboard keyevent)")
+    log("  点击剪贴板气泡 (640, 1812)...")
+    _adb('input tap 640 1812', timeout=5)
+    log("OK (clipboard bubble)")
 
 
 def _type_ascii_segment(text):
