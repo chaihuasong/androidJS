@@ -97,31 +97,61 @@ $PYTHON $SCRIPT key home
 $PYTHON $SCRIPT tap-re "微信|WeChat"
 ```
 
-### 全网搜索（必须同时搜 Google + Bing）
+### 全网搜索（必须同时搜 Google + Bing，读多条详情后再总结）
 
-执行任何"搜索"任务时，**必须同时在 Google 和 Bing 两个引擎搜索**，将两组结果汇总后再回答，以保证结果全面准确。
+执行任何"搜索"任务时，**必须按以下完整流程执行**，不能只看摘要就回复。
+
+#### 第一步：双引擎搜索，收集链接列表
 
 ```bash
 ADB=/data/data/com.termux/files/usr/bin/adb
 
-# 1. 先在 Google 搜索
-$ADB shell am start -a android.intent.action.VIEW \
-  -d "https://www.google.com/search?q=你的关键词"
-# 等页面加载完后，用 dump-clickable 读取搜索结果
-$PYTHON $SCRIPT dump-clickable
+# 关键词 URL 编码（中文必须编码）
+KEYWORD=$(python3 -c "import urllib.parse; print(urllib.parse.quote('你的关键词'))")
 
-# 2. 再在 Bing 搜索（开新页面）
+# 1. Google 搜索
 $ADB shell am start -a android.intent.action.VIEW \
-  -d "https://www.bing.com/search?q=你的关键词"
+  -d "https://www.google.com/search?q=$KEYWORD"
+$PYTHON $SCRIPT dump-clickable   # 读取搜索结果列表
+$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable  # 滑动获取更多
+$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable  # 再滑一次
+
+# 2. Bing 搜索
+$ADB shell am start -a android.intent.action.VIEW \
+  -d "https://www.bing.com/search?q=$KEYWORD"
 $PYTHON $SCRIPT dump-clickable
+$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable
+$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable
 ```
 
+#### 第二步：点击进入链接，读取详情内容
+
+**从两个引擎的结果中，合计至少点开 5 条链接**（每个引擎至少 2 条），用 `dump` 读取页面正文：
+
+```bash
+# 点击搜索结果中的标题链接
+$PYTHON $SCRIPT tap-re "目标标题关键词"
+$PYTHON $SCRIPT dump           # 读取页面详细内容
+$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump  # 继续读更多正文
+$PYTHON $SCRIPT key back       # 返回搜索结果
+
+# 重复以上步骤，点开下一条链接
+```
+
+#### 第三步：汇总所有来源，给出完整结论
+
+**禁止在只看摘要/只搜一个引擎/只读一条链接的情况下回复。** 总结必须：
+- 注明信息来自哪些来源（Google / Bing / 具体网站）
+- 合并两个引擎的不同信息，避免重复
+- 如果各来源有矛盾，明确指出
+
 **规则：**
-- 关键词需 URL 编码，中文用 `python3 -c "import urllib.parse; print(urllib.parse.quote('关键词'))"` 生成
-- 两个引擎都搜完后，汇总结果再回复，不能只搜一个
-- 如需进入具体链接查看详情，用 `tap-re` 点击标题后用 `dump` 读取页面内容
-- 搜索结果页可以滑动加载更多，每次 `swipe scroll-down` 后再 `dump-clickable` 读取新出现的结果
-- 如果首屏结果不够，最多向下滑动 3 次以获取更多条目，两个引擎都如此操作
+- 关键词必须 URL 编码，中文直接拼接会导致搜索失败
+- 两个引擎都必须搜，不能只用一个
+- 每个引擎至少滑动 2 次加载更多结果
+- 合计至少点开 5 条链接读详情，不能只看搜索摘要
+- 点开链接后用 `dump`（不是 `dump-clickable`）读取正文，必要时继续 `swipe scroll-down` 读更多
+- 所有来源读完后统一总结，不要边读边汇报
 
 ---
 
