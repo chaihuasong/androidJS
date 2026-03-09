@@ -668,12 +668,10 @@ def cmd_screenshot():
     name       = name.replace('.png', '.jpg')
     local      = local.replace('.png', '.jpg')
 
-    # 1. screencap — 诊断日志 + su/adb 明确分路
     su_avail = _check_su()
     log(f"  截图（su可用={su_avail}）...")
     taken = False
 
-    # 路径A：su 直接执行（无网络，< 2s）
     if su_avail:
         try:
             r = subprocess.run(['su', '-c', f'{SCREENCAP} -p {remote_png}'],
@@ -687,8 +685,6 @@ def cmd_screenshot():
             log("  su 截图超时，回退 adb...")
             subprocess.run('pkill -9 -f "su.*screencap" 2>/dev/null; true', shell=True, timeout=3)
 
-    # 路径B：adb loopback（fallback）
-    # 每次重试前都做完整 reconnect（杀残留进程 + disconnect + connect）
     if not taken:
         for attempt in range(1, 4):
             reconnect_adb()
@@ -699,7 +695,6 @@ def cmd_screenshot():
                 taken = True
                 break
             except subprocess.TimeoutExpired:
-                # shell 可能未退出但文件已写完 — 先检查
                 if os.path.exists(remote_png) and os.path.getsize(remote_png) > 1000:
                     log("  shell 未退出但文件已写完，继续")
                     taken = True
@@ -709,7 +704,6 @@ def cmd_screenshot():
             log("ERROR: screencap 全部超时")
             sys.exit(1)
 
-    # 2. 直接读 /sdcard 文件（Termux 有 external storage 权限），压缩为 JPEG，无需 adb pull
     log("  压缩截图...")
     try:
         from PIL import Image

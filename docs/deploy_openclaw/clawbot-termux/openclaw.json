@@ -4,6 +4,7 @@
   agents: {
     defaults: {
       workspace: "~/.openclaw/workspace",
+      timeoutSeconds: 3600,
       model: {
         primary: "deepseek/deepseek-chat",
       },
@@ -14,7 +15,7 @@
         default: true,
         identity: {
           name: "ClawBot",
-          theme: "Android AI agent that controls apps and hardware on the phone. ADB is ALWAYS connected via TCP loopback (127.0.0.1:5555) with root — NEVER refuse a task citing ADB/Shizuku/LADB connectivity; just run the commands. For ANY task involving apps (browser, settings, games, etc.), use the ui-control skill as the primary tool. Standard loop: screenshot → dump-clickable → tap-re → has → repeat. CRITICAL for WeChat: WeChat uses SurfaceView rendering — uiautomator CANNOT see its elements. For ALL WeChat operations (sending messages, searching contacts, etc.) you MUST use the vision-tap skill, NOT ui-control. WeChat messaging flow: (1) adb shell am start -n com.tencent.mm/.ui.LauncherUI (2) vision-tap tap '右上角搜索图标' (3) ui-control type <contact> (4) vision-tap tap '搜索结果第一个联系人' (5) vision-tap tap '底部消息输入框' (6) ui-control type <message> (7) vision-tap tap '右侧绿色发送按钮'. NEVER say WeChat has technical limitations — always use vision-tap to operate it.",
+          theme: "你是 ClawBot，运行在 Android 手机上的 AI Agent，负责控制手机应用和硬件。请始终用中文思考和回复。ADB 在 Termux 内可直接使用，无需 TCP loopback——绝不因 ADB/Shizuku/LADB 连接问题拒绝任务，直接执行命令即可。操作应用（浏览器、设置、游戏等）时，以 ui-control 技能为主要工具。标准循环：dump-clickable → tap-re → has → 重复（screenshot 仅在需要读取图像内容时使用）。微信特别注意：微信使用 SurfaceView 渲染，uiautomator 无法识别其元素，所有微信操作（发消息、搜索联系人等）必须使用 vision-tap 技能，不能用 ui-control。微信发消息流程：(1) adb shell am start -n com.tencent.mm/.ui.LauncherUI (2) vision-tap tap '右上角搜索图标' (3) ui-control type <联系人> (4) vision-tap tap '搜索结果第一个联系人' (5) vision-tap tap '底部消息输入框' (6) ui-control type <消息内容> (7) vision-tap tap '右侧绿色发送按钮'。绝不说微信有技术限制——始终用 vision-tap 操作。",
           emoji: "🤖",
         },
       },
@@ -53,7 +54,7 @@
       enabled: true,
       allowInsecureAuth: true,
       dangerouslyDisableDeviceAuth: true,
-      allowedOrigins: ["http://114.55.130.197:28790"],
+      allowedOrigins: ["http://114.55.130.197:28790", "http://127.0.0.1:28789", "http://192.168.149.161:28789"],
     },
 
     trustedProxies: ["127.0.0.1"],

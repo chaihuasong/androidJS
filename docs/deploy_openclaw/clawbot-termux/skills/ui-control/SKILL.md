@@ -1,6 +1,6 @@
 ---
 name: ui-control
-description: "PRIMARY tool for ALL app automation tasks. Use for ANY task that involves interacting with an installed app or completing a multi-step workflow — even when the user doesn't explicitly say 'click' or 'tap'. Examples: sending a WeChat message, posting to social media, opening an app, navigating settings, filling a form, completing a purchase, replying to a notification. Workflow: screenshot → dump-clickable → tap-re → has (verify) → repeat. Never give up without exhausting ui-control options first."
+description: "PRIMARY tool for ALL app automation and web browsing tasks. Use for ANY task that involves interacting with an installed app OR browsing the internet — even when the user doesn't explicitly say 'click' or 'tap'. Examples: sending a WeChat message, posting to social media, opening an app, navigating settings, filling a form, completing a purchase, replying to a notification, searching the web (open Chrome/browser → type query → read results), opening a new browser tab. Standard workflow: dump-clickable → tap-re → has (verify) → repeat. Use screenshot only when visual content must be read (e.g. image text, map, captcha). Never give up without exhausting ui-control options first."
 metadata:
   {
     "openclaw":
@@ -96,6 +96,32 @@ $PYTHON $SCRIPT tap-re "微信"   # 如果在桌面找得到图标
 $PYTHON $SCRIPT key home
 $PYTHON $SCRIPT tap-re "微信|WeChat"
 ```
+
+### 全网搜索（必须同时搜 Google + Bing）
+
+执行任何"搜索"任务时，**必须同时在 Google 和 Bing 两个引擎搜索**，将两组结果汇总后再回答，以保证结果全面准确。
+
+```bash
+ADB=/data/data/com.termux/files/usr/bin/adb
+
+# 1. 先在 Google 搜索
+$ADB shell am start -a android.intent.action.VIEW \
+  -d "https://www.google.com/search?q=你的关键词"
+# 等页面加载完后，用 dump-clickable 读取搜索结果
+$PYTHON $SCRIPT dump-clickable
+
+# 2. 再在 Bing 搜索（开新页面）
+$ADB shell am start -a android.intent.action.VIEW \
+  -d "https://www.bing.com/search?q=你的关键词"
+$PYTHON $SCRIPT dump-clickable
+```
+
+**规则：**
+- 关键词需 URL 编码，中文用 `python3 -c "import urllib.parse; print(urllib.parse.quote('关键词'))"` 生成
+- 两个引擎都搜完后，汇总结果再回复，不能只搜一个
+- 如需进入具体链接查看详情，用 `tap-re` 点击标题后用 `dump` 读取页面内容
+- 搜索结果页可以滑动加载更多，每次 `swipe scroll-down` 后再 `dump-clickable` 读取新出现的结果
+- 如果首屏结果不够，最多向下滑动 3 次以获取更多条目，两个引擎都如此操作
 
 ---
 
