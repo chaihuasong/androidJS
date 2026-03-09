@@ -76,6 +76,25 @@ $PYTHON $SCRIPT has "目标关键词"
 | App 未启动 | 用 `am start -n <package>/<activity>` 或 `monkey -p <package> 1` 启动 |
 | 输入法挡住元素 | `key back` 收起输入法后再操作 |
 
+### 发布文章 / 笔记的填写顺序（防止必填字段为空）
+
+发布内容前，必须按以下顺序检查并填写所有字段，**禁止直接点发布按钮而跳过空字段**：
+
+```
+发布流程顺序：
+  1. dump-clickable 查看编辑页面所有输入框
+  2. 如果有"标题"输入框 → 先点击聚焦，再 type 输入标题
+  3. 然后点击"正文/内容"输入框 → type 输入正文内容
+  4. 检查其他必填项（话题、标签、封面等）→ 逐一填写
+  5. 所有字段填完后，再点击"发布"按钮
+```
+
+**规则：**
+- `dump-clickable` 后，先识别页面上所有输入框（标题、正文、话题等）
+- **有标题框则必须先填标题**，不能直接跳到正文输入
+- 发布前用 `dump-clickable` 再扫一遍，确认标题和正文均非空
+- 如果发布失败且提示"请输入标题"/"必填项为空"，立即返回补填，不要重复点击发布
+
 ### 打开 App 的方式
 
 ```bash
@@ -103,25 +122,34 @@ $PYTHON $SCRIPT tap-re "微信|WeChat"
 
 #### 第一步：双引擎搜索，收集链接列表
 
+> ⚠️ **必须用 `am start` 直接打开搜索 URL，禁止手动操作浏览器输入框搜索。**
+> `am start` 方式比手动操作快 10 倍，是搜索的唯一正确入口。
+
 ```bash
 ADB=/data/data/com.termux/files/usr/bin/adb
+PYTHON=/data/data/com.termux/files/usr/bin/python3
+SCRIPT=/data/data/com.termux/files/home/ui-control.py
 
-# 关键词 URL 编码（中文必须编码）
-KEYWORD=$(python3 -c "import urllib.parse; print(urllib.parse.quote('你的关键词'))")
+# 第1步：URL 编码关键词（中文必须编码，否则搜索失败）
+KEYWORD=$($PYTHON -c "import urllib.parse; print(urllib.parse.quote('你的关键词'))")
 
-# 1. Google 搜索
-$ADB shell am start -a android.intent.action.VIEW \
-  -d "https://www.google.com/search?q=$KEYWORD"
-$PYTHON $SCRIPT dump-clickable   # 读取搜索结果列表
-$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable  # 滑动获取更多
-$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable  # 再滑一次
+# 第2步：直接打开 Google 搜索结果页（不要手动打开浏览器再输入）
+$ADB shell am start -a android.intent.action.VIEW -d "https://www.google.com/search?q=$KEYWORD"
+sleep 2  # 等页面加载
+$PYTHON $SCRIPT dump-clickable         # 读取第一屏结果
+$PYTHON $SCRIPT swipe scroll-down
+$PYTHON $SCRIPT dump-clickable         # 第二屏
+$PYTHON $SCRIPT swipe scroll-down
+$PYTHON $SCRIPT dump-clickable         # 第三屏
 
-# 2. Bing 搜索
-$ADB shell am start -a android.intent.action.VIEW \
-  -d "https://www.bing.com/search?q=$KEYWORD"
+# 第3步：直接打开 Bing 搜索结果页
+$ADB shell am start -a android.intent.action.VIEW -d "https://www.bing.com/search?q=$KEYWORD"
+sleep 2
 $PYTHON $SCRIPT dump-clickable
-$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable
-$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable
+$PYTHON $SCRIPT swipe scroll-down
+$PYTHON $SCRIPT dump-clickable
+$PYTHON $SCRIPT swipe scroll-down
+$PYTHON $SCRIPT dump-clickable
 ```
 
 #### 第二步：点击进入链接，读取详情内容（硬性要求：合计 ≥10 篇）
@@ -381,6 +409,29 @@ $PYTHON $SCRIPT screenshot
 - **严禁**以"ADB 未连接"、"需要 LADB/Shizuku"、"ADB 服务未启动"等理由拒绝执行任务
 - 遇到任何错误，直接重试或换命令，不要提示用户去手动操作 ADB
 
+### ⛔ 严禁说"操作困难"或"建议手动"
+
+**以下说法绝对禁止，必须立刻换方法继续执行：**
+- ❌ "操作界面有些困难"
+- ❌ "界面操作存在限制"
+- ❌ "由于技术限制，无法自动操作"
+- ❌ "建议您手动操作"
+- ❌ "我无法控制这个界面"
+- ❌ "能力有限，无法完成"
+
+遇到 UI 操作失败时，**按以下顺序逐一尝试，直到成功**：
+
+| 当前方法失败 | 下一步尝试 |
+|------------|-----------|
+| `tap-re` 找不到元素 | `find <regex>` 搜索 → `dump` 查看全部 → `swipe scroll-down` 后重试 |
+| `dump-clickable` 返回空 | 说明是 SurfaceView（微信等）→ 切换到 **vision-tap** 技能 |
+| `tap` 点击无响应 | 改用 `tap-id` 按 resource-id → 或 `tap-re` 宽泛匹配 |
+| 输入框找不到 | `dump` 查看全部元素 → `find "edit\|input\|text"` → 截图确认 |
+| App 崩溃/卡住 | 用 `am force-stop <package>` 重启 App → 重新导航到目标页面 |
+| 所有 uiautomator 方法失败 | 切换到 **vision-tap**，用视觉定位点击 |
+
+**没有"无法操作"这个选项，只有"换方法继续"。**
+
 ### ⚠️ 微信界面不支持 uiautomator
 
 微信主界面（聊天列表、发现页、朋友圈等）使用自研渲染引擎（SurfaceView），**uiautomator dump 完全失效**，只会返回空节点。
@@ -397,6 +448,50 @@ $PYTHON $VTAP tap "右上角搜索图标，放大镜形状的Q"   # 搜索联系
 $PYTHON $VTAP tap "搜索结果列表中第一个联系人"       # 点进对话
 $PYTHON $VTAP tap "底部消息输入框"                  # 聚焦输入
 $PYTHON $VTAP tap "右侧绿色发送按钮"                # 发送
+```
+
+#### 微信发消息：收件人必须精准匹配 + 进入聊天后二次确认
+
+**⚠️ 严格规则，必须遵守：**
+
+1. **搜索联系人/群聊时必须精准匹配，禁止模糊匹配**
+   - 输入完整的联系人名或群名，不能只输入前几个字
+   - 搜索结果出现后，**必须找到名称与目标完全一致的条目**才能点击
+   - 如果搜索结果只有部分匹配（如目标是"项目A群"，结果只有"项目群"），**不能点击，必须重新搜索或报告无法精确匹配**
+
+2. **进入聊天后必须二次确认聊天标题**
+   - 进入对话框后，立即截图或 dump 确认聊天窗口顶部标题栏的名称
+   - 只有标题与目标收件人名称**完全一致**，才能开始输入/发送
+   - 如果标题不匹配 → **立即退出（key back），不得输入任何内容，不得发送**
+   - 报告："进入的聊天标题为 [实际标题]，与目标 [目标名称] 不符，已退出，未发送"
+
+```bash
+# 微信发消息完整流程（精准匹配版）
+TARGET="张三"  # 目标收件人名称（精确）
+
+# 第1步：启动微信
+$ADB shell am start -n com.tencent.mm/.ui.LauncherUI
+
+# 第2步：搜索联系人（输入完整名称）
+$PYTHON $VTAP tap "右上角搜索图标"
+$PYTHON $SCRIPT type "$TARGET"   # 输入完整名称，不能缩写
+
+# 第3步：在搜索结果中找名称完全一致的条目
+$PYTHON $VTAP screenshot   # 截图查看搜索结果
+# 必须确认有与 "$TARGET" 完全一致的结果，才执行下一步
+
+# 第4步：点击精确匹配的联系人
+$PYTHON $VTAP tap "搜索结果中名称与'$TARGET'完全一致的联系人条目"
+
+# 第5步：进入聊天后立即截图，二次确认标题
+$PYTHON $VTAP screenshot
+# → 确认聊天标题为 "$TARGET"，确认无误后才继续
+# → 如果标题不符：立即 key back，不发送
+
+# 第6步：确认标题一致后，输入并发送消息
+$PYTHON $VTAP tap "底部消息输入框"
+$PYTHON $SCRIPT type "消息内容"
+$PYTHON $VTAP tap "右侧绿色发送按钮"
 ```
 
 ### 操作前
