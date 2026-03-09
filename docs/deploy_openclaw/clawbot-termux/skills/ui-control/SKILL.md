@@ -124,32 +124,41 @@ $PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable
 $PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump-clickable
 ```
 
-#### 第二步：点击进入链接，读取详情内容
+#### 第二步：点击进入链接，读取详情内容（硬性要求：合计 ≥10 篇）
 
-**从两个引擎的结果中，合计至少点开 5 条链接**（每个引擎至少 2 条），用 `dump` 读取页面正文：
+**⚠️ 强制要求：合计必须点开并读完至少 10 篇文章**（Google ≥5 篇，Bing ≥5 篇）。未达到 10 篇前不能进入第三步。
 
+每篇文章的读取流程：
 ```bash
-# 点击搜索结果中的标题链接
+# 点击标题进入文章
 $PYTHON $SCRIPT tap-re "目标标题关键词"
-$PYTHON $SCRIPT dump           # 读取页面详细内容
-$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump  # 继续读更多正文
-$PYTHON $SCRIPT key back       # 返回搜索结果
+$PYTHON $SCRIPT dump                                        # 读取页面正文
+$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump  # 继续读下半部分
+$PYTHON $SCRIPT key back                                    # 返回搜索结果列表
 
-# 重复以上步骤，点开下一条链接
+# 滑动到下一篇（返回列表后必须先滑动，否则会点到同一篇）
+$PYTHON $SCRIPT swipe scroll-down
+# 再读下一篇……重复直到该引擎读完 5 篇
 ```
+
+**自我检查（每读完一篇都要计数）：**
+- 已读 Google: X 篇 / Bing: Y 篇，合计 Z 篇
+- 未满 10 篇 → 继续读，不能停
+- 满 10 篇 → 进入第三步汇总
 
 #### 第三步：汇总所有来源，给出完整结论
 
-**禁止在只看摘要/只搜一个引擎/只读一条链接的情况下回复。** 总结必须：
-- 注明信息来自哪些来源（Google / Bing / 具体网站）
+**禁止在读取不足 10 篇的情况下回复。** 总结必须：
+- 标注信息来自哪些来源（Google / Bing / 具体网站名）
 - 合并两个引擎的不同信息，避免重复
 - 如果各来源有矛盾，明确指出
+- 在回复末尾注明"共读取 X 篇文章（Google X 篇 + Bing X 篇）"
 
 **规则：**
 - 关键词必须 URL 编码，中文直接拼接会导致搜索失败
 - 两个引擎都必须搜，不能只用一个
-- 每个引擎至少滑动 2 次加载更多结果
-- 合计至少点开 5 条链接读详情，不能只看搜索摘要
+- 每个引擎至少滑动 3 次加载更多结果（确保有足够链接可点）
+- **合计至少点开 10 篇文章读详情**，Google ≥5 篇，Bing ≥5 篇，不能只看搜索摘要
 - 点开链接后用 `dump`（不是 `dump-clickable`）读取正文，必要时继续 `swipe scroll-down` 读更多
 - 所有来源读完后统一总结，不要边读边汇报
 
