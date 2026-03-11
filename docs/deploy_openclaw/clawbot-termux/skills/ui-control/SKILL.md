@@ -1,6 +1,6 @@
 ---
 name: ui-control
-description: "PRIMARY tool for ALL app automation tasks. Use for ANY task that involves interacting with an installed app — even when the user doesn't explicitly say 'click' or 'tap'. Examples: sending a WeChat message, posting to social media, opening an app, navigating settings, filling a form, completing a purchase, replying to a notification, opening a specific URL in the browser. Standard workflow: dump-clickable → tap-re → has (verify) → repeat. Use screenshot only when visual content must be read (e.g. image text, map, captcha). Never give up without exhausting ui-control options first. ⚠️ For internet search tasks, use the web-search skill first to get links, then use ui-control to open and read the important links."
+description: "Tool for app UI automation — clicking, typing, swiping, reading screen content. Use for tasks like sending a WeChat message, posting to social media, navigating settings, filling a form. Standard workflow: dump-clickable → tap-re → has (verify) → repeat. ❌ DO NOT use this skill for internet search tasks — use the web-search skill instead. ❌ DO NOT use this skill to open URLs for reading web page content — use curl in web-search skill instead."
 metadata:
   {
     "openclaw":
