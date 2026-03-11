@@ -1,3 +1,16 @@
+---
+name: web-search
+description: "Search the internet using Google Custom Search API. Use this skill FIRST for ANY task that requires searching the web or gathering online information — do NOT open a browser manually. Returns a list of titles, URLs, and snippets. After getting URLs, use curl to fetch page content directly."
+metadata:
+  {
+    "openclaw":
+      {
+        "emoji": "🔍",
+        "requires": { "bins": ["curl"] },
+      },
+  }
+---
+
 # web-search 技能
 
 使用 Google Custom Search API 执行网络搜索，获取真实网页结果。
