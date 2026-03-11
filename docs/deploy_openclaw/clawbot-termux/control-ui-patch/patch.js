@@ -68,22 +68,10 @@
     initLang();
   }
 
-  // ── 刷新按钮（Agent 运行期间每 5s 点击）────────────────────────────────────
+  // ── 刷新按钮（tool_start / tool_end 时即时点击）──────────────────────────
   function clickRefresh() {
     var allBtns = document.querySelectorAll('button, [role="button"]');
     if (allBtns[8]) allBtns[8].click();
-  }
-
-  var _refreshTimer = null;
-
-  function startRefreshLoop() {
-    if (_refreshTimer) return;
-    _refreshTimer = setInterval(clickRefresh, 5000);
-  }
-
-  function stopRefreshLoop() {
-    if (_refreshTimer) { clearInterval(_refreshTimer); _refreshTimer = null; }
-    setTimeout(clickRefresh, 300);
   }
 
   // ── WebSocket 拦截 ─────────────────────────────────────────────────────────
@@ -96,10 +84,7 @@
         if (!msg || msg.type !== 'event' || msg.event !== 'agent') return;
         var p = msg.payload || {};
         var stream = p.stream;
-        var phase = (p.data || {}).phase;
 
-        if (stream === 'lifecycle' && phase === 'start') startRefreshLoop();
-        if (stream === 'lifecycle' && (phase === 'end' || phase === 'error' || phase === 'complete')) stopRefreshLoop();
         if (stream === 'tool_start' || stream === 'tool_end') clickRefresh();
       } catch(e) {}
     });

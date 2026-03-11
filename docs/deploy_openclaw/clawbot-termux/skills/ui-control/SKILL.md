@@ -1,6 +1,6 @@
 ---
 name: ui-control
-description: "PRIMARY tool for ALL app automation and web browsing tasks. Use for ANY task that involves interacting with an installed app OR browsing the internet — even when the user doesn't explicitly say 'click' or 'tap'. Examples: sending a WeChat message, posting to social media, opening an app, navigating settings, filling a form, completing a purchase, replying to a notification, searching the web (open Chrome/browser → type query → read results), opening a new browser tab. Standard workflow: dump-clickable → tap-re → has (verify) → repeat. Use screenshot only when visual content must be read (e.g. image text, map, captcha). Never give up without exhausting ui-control options first."
+description: "PRIMARY tool for ALL app automation tasks. Use for ANY task that involves interacting with an installed app — even when the user doesn't explicitly say 'click' or 'tap'. Examples: sending a WeChat message, posting to social media, opening an app, navigating settings, filling a form, completing a purchase, replying to a notification, opening a specific URL in the browser. Standard workflow: dump-clickable → tap-re → has (verify) → repeat. Use screenshot only when visual content must be read (e.g. image text, map, captcha). Never give up without exhausting ui-control options first. ⚠️ For internet search tasks, use the web-search skill first to get links, then use ui-control to open and read the important links."
 metadata:
   {
     "openclaw":
@@ -116,79 +116,32 @@ $PYTHON $SCRIPT key home
 $PYTHON $SCRIPT tap-re "微信|WeChat"
 ```
 
-### 全网搜索（必须同时搜 Google + Bing，读多条详情后再总结）
+### 全网搜索（必须用 web-search 技能）
 
-执行任何"搜索"任务时，**必须按以下完整流程执行**，不能只看摘要就回复。
+⚠️ **执行任何"搜索互联网"任务时，禁止打开浏览器手动搜索。必须使用 `web-search` 技能。**
 
-#### 第一步：双引擎搜索，收集链接列表
+#### 第一步：用 web-search 技能获取链接列表
 
-> ⚠️ **必须用 `am start` 直接打开搜索 URL，禁止手动操作浏览器输入框搜索。**
-> `am start` 方式比手动操作快 10 倍，是搜索的唯一正确入口。
+```bash
+GOOGLE_SEARCH_API_KEY=$(grep GOOGLE_SEARCH_API_KEY ~/.openclaw/.env | cut -d= -f2) \
+GOOGLE_SEARCH_CX=$(grep GOOGLE_SEARCH_CX ~/.openclaw/.env | cut -d= -f2) \
+bash ~/.openclaw/workspace/skills/web-search/web-search.sh "搜索关键词" 10
+```
+
+#### 第二步：用 ui-control 打开重要链接读取详情
+
+搜索返回链接列表后，对重要链接用 `am start` 打开浏览器读取详情：
 
 ```bash
 ADB=/data/data/com.termux/files/usr/bin/adb
 PYTHON=/data/data/com.termux/files/usr/bin/python3
 SCRIPT=/data/data/com.termux/files/home/ui-control.py
 
-# 第1步：URL 编码关键词（中文必须编码，否则搜索失败）
-KEYWORD=$($PYTHON -c "import urllib.parse; print(urllib.parse.quote('你的关键词'))")
-
-# 第2步：直接打开 Google 搜索结果页（不要手动打开浏览器再输入）
-$ADB shell am start -a android.intent.action.VIEW -d "https://www.google.com/search?q=$KEYWORD"
-sleep 2  # 等页面加载
-$PYTHON $SCRIPT dump-clickable         # 读取第一屏结果
-$PYTHON $SCRIPT swipe scroll-down
-$PYTHON $SCRIPT dump-clickable         # 第二屏
-$PYTHON $SCRIPT swipe scroll-down
-$PYTHON $SCRIPT dump-clickable         # 第三屏
-
-# 第3步：直接打开 Bing 搜索结果页
-$ADB shell am start -a android.intent.action.VIEW -d "https://www.bing.com/search?q=$KEYWORD"
+$ADB shell am start -a android.intent.action.VIEW -d "目标URL"
 sleep 2
-$PYTHON $SCRIPT dump-clickable
-$PYTHON $SCRIPT swipe scroll-down
-$PYTHON $SCRIPT dump-clickable
-$PYTHON $SCRIPT swipe scroll-down
-$PYTHON $SCRIPT dump-clickable
-```
-
-#### 第二步：点击进入链接，读取详情内容（硬性要求：合计 ≥10 篇）
-
-**⚠️ 强制要求：合计必须点开并读完至少 10 篇文章**（Google ≥5 篇，Bing ≥5 篇）。未达到 10 篇前不能进入第三步。
-
-每篇文章的读取流程：
-```bash
-# 点击标题进入文章
-$PYTHON $SCRIPT tap-re "目标标题关键词"
 $PYTHON $SCRIPT dump                                        # 读取页面正文
 $PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump  # 继续读下半部分
-$PYTHON $SCRIPT key back                                    # 返回搜索结果列表
-
-# 滑动到下一篇（返回列表后必须先滑动，否则会点到同一篇）
-$PYTHON $SCRIPT swipe scroll-down
-# 再读下一篇……重复直到该引擎读完 5 篇
 ```
-
-**自我检查（每读完一篇都要计数）：**
-- 已读 Google: X 篇 / Bing: Y 篇，合计 Z 篇
-- 未满 10 篇 → 继续读，不能停
-- 满 10 篇 → 进入第三步汇总
-
-#### 第三步：汇总所有来源，给出完整结论
-
-**禁止在读取不足 10 篇的情况下回复。** 总结必须：
-- 标注信息来自哪些来源（Google / Bing / 具体网站名）
-- 合并两个引擎的不同信息，避免重复
-- 如果各来源有矛盾，明确指出
-- 在回复末尾注明"共读取 X 篇文章（Google X 篇 + Bing X 篇）"
-
-**规则：**
-- 关键词必须 URL 编码，中文直接拼接会导致搜索失败
-- 两个引擎都必须搜，不能只用一个
-- 每个引擎至少滑动 3 次加载更多结果（确保有足够链接可点）
-- **合计至少点开 10 篇文章读详情**，Google ≥5 篇，Bing ≥5 篇，不能只看搜索摘要
-- 点开链接后用 `dump`（不是 `dump-clickable`）读取正文，必要时继续 `swipe scroll-down` 读更多
-- 所有来源读完后统一总结，不要边读边汇报
 
 ---
 
@@ -449,6 +402,33 @@ $PYTHON $VTAP tap "搜索结果列表中第一个联系人"       # 点进对话
 $PYTHON $VTAP tap "底部消息输入框"                  # 聚焦输入
 $PYTHON $VTAP tap "右侧绿色发送按钮"                # 发送
 ```
+
+#### 发短信：手机号必须验证为 11 位
+
+**⚠️ 强制规则：发送短信前必须校验手机号，不合法则停止。**
+
+```bash
+# 校验手机号是否为 11 位纯数字
+PHONE="13812345678"
+if ! echo "$PHONE" | grep -Eq '^[0-9]{11}$'; then
+  echo "❌ 手机号不合法：'$PHONE' 不是 11 位纯数字，已终止，未发送"
+  exit 1
+fi
+echo "✅ 手机号合法：$PHONE，继续发送"
+
+# 打开短信 App 并发送
+$ADB shell am start -a android.intent.action.SENDTO -d "smsto:$PHONE" --es sms_body "消息内容"
+```
+
+**规则：**
+- 手机号必须恰好 11 位纯数字（`^[0-9]{11}$`），不能多位不能少位
+- 号码中不能含空格、横线、括号等任何非数字字符（需预处理清洗后再校验）
+- 校验不通过 → **立即停止，不发送，向用户索要完整号码**
+- 用户提供的号码含格式字符（如 `138-1234-5678`）→ 先去除非数字字符再校验
+- **⛔ 严禁用不完整号码（如只有3位、7位等）直接发送或尝试发送** — 即使用户只说了"发给135"，也必须停下来问："请提供完整的11位手机号"，不得猜测补全
+- 用户没有提供手机号 → 必须先问用户要号码，不得自行填写任何号码
+
+---
 
 #### 微信发消息：收件人必须精准匹配 + 进入聊天后二次确认
 

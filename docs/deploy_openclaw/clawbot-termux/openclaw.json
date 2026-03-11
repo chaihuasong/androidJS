@@ -15,7 +15,7 @@
         default: true,
         identity: {
           name: "ClawBot",
-          theme: "你是 ClawBot，运行在 Android 手机上的 AI Agent，负责控制手机应用和硬件。请始终用中文思考和回复。ADB 在 Termux 内可直接使用，无需 TCP loopback——绝不因 ADB/Shizuku/LADB 连接问题拒绝任务，直接执行命令即可。操作应用（浏览器、设置、游戏等）时，以 ui-control 技能为主要工具。标准循环：dump-clickable → tap-re → has → 重复（screenshot 仅在需要读取图像内容时使用）。微信特别注意：微信使用 SurfaceView 渲染，uiautomator 无法识别其元素，所有微信操作（发消息、搜索联系人等）必须使用 vision-tap 技能，不能用 ui-control。微信发消息流程：(1) adb shell am start -n com.tencent.mm/.ui.LauncherUI (2) vision-tap tap '右上角搜索图标' (3) ui-control type <联系人> (4) vision-tap tap '搜索结果第一个联系人' (5) vision-tap tap '底部消息输入框' (6) ui-control type <消息内容> (7) vision-tap tap '右侧绿色发送按钮'。绝不说微信有技术限制——始终用 vision-tap 操作。【执行原则】用户明确下达的任务直接执行到底，不需要中途二次确认——搜索任务执行完整双引擎+多链接流程、发布任务直接发布、发消息直接发。只有任务有歧义或操作具有破坏性时才暂停询问。",
+          theme: "你是 ClawBot，运行在 Android 手机上的 AI Agent，负责控制手机应用和硬件。请始终用中文思考和回复。ADB 在 Termux 内可直接使用，无需 TCP loopback——绝不因 ADB/Shizuku/LADB 连接问题拒绝任务，直接执行命令即可。操作应用（浏览器、设置、游戏等）时，以 ui-control 技能为主要工具。标准循环：dump-clickable → tap-re → has → 重复（screenshot 仅在需要读取图像内容时使用）。【全网搜索策略】需要搜索互联网信息时，必须优先使用 web-search 技能（Google Search API），禁止打开浏览器手动搜索。调用方式：GOOGLE_SEARCH_API_KEY=$(grep GOOGLE_SEARCH_API_KEY ~/.openclaw/.env | cut -d= -f2) GOOGLE_SEARCH_CX=$(grep GOOGLE_SEARCH_CX ~/.openclaw/.env | cut -d= -f2) bash ~/.openclaw/workspace/skills/web-search/web-search.sh \"关键词\" 10。获得链接列表后，再用 ui-control 打开重要链接读取详情。微信特别注意：微信使用 SurfaceView 渲染，uiautomator 无法识别其元素，所有微信操作（发消息、搜索联系人等）必须使用 vision-tap 技能，不能用 ui-control。微信发消息流程：(1) adb shell am start -n com.tencent.mm/.ui.LauncherUI (2) vision-tap tap '右上角搜索图标' (3) ui-control type <联系人> (4) vision-tap tap '搜索结果第一个联系人' (5) vision-tap tap '底部消息输入框' (6) ui-control type <消息内容> (7) vision-tap tap '右侧绿色发送按钮'。绝不说微信有技术限制——始终用 vision-tap 操作。【执行原则】用户明确下达的任务直接执行到底，不需要中途二次确认——搜索任务执行完整流程、发布任务直接发布、发消息直接发。只有任务有歧义或操作具有破坏性时才暂停询问。【发布内容约束】发布文字内容（评论、帖子、消息等）时，必须将完整文字全部输入完毕后才能点击发布按钮——严禁输入一部分就发布。输入前先确认输入框内容与预期完全一致，输入后用 has 或 screenshot 验证文字已完整显示再发布。",
           emoji: "🤖",
         },
       },
@@ -26,11 +26,30 @@
     providers: {
       deepseek: {
         baseUrl: "https://api.deepseek.com",
-        apiKey: "${DEEPSEEK_API_KEY}",
+        apiKey: "${DEEPSEEK_TOKEN}",
         api: "openai-completions",
         models: [
           { id: "deepseek-chat", name: "DeepSeek Chat" },
           { id: "deepseek-reasoner", name: "DeepSeek Reasoner" },
+        ],
+      },
+      kimi: {
+        baseUrl: "https://api.moonshot.cn/v1/",
+        apiKey: "${KIMI_API_KEY}",
+        api: "openai-completions",
+        models: [
+          { id: "moonshot-v1-8k", name: "Kimi 8k" },
+          { id: "moonshot-v1-32k", name: "Kimi 32k" },
+          { id: "moonshot-v1-128k", name: "Kimi 128k" },
+        ],
+      },
+      minimax: {
+        baseUrl: "https://api.minimax.chat/v1/",
+        apiKey: "${MINIMAX_API_KEY}",
+        api: "openai-completions",
+        models: [
+          { id: "MiniMax-Text-01", name: "MiniMax Text-01" },
+          { id: "abab6.5s-chat", name: "MiniMax 6.5s" },
         ],
       },
       siliconflow: {
@@ -40,6 +59,26 @@
         models: [
           { id: "deepseek-ai/deepseek-vl2", name: "DeepSeek VL2 (Vision)" },
           { id: "Qwen/Qwen2-VL-72B-Instruct", name: "Qwen2 VL 72B" },
+        ],
+      },
+      gemini: {
+        baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/",
+        apiKey: "${GEMINI_API_KEY}",
+        api: "openai-completions",
+        models: [
+          { id: "gemini-3.1-flash-lite-preview", name: "Gemini 3.1 Flash Lite" },
+          { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+        ],
+      },
+      bigmodel: {
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4/",
+        apiKey: "${BIGMODEL_API_KEY}",
+        api: "openai-completions",
+        models: [
+          { id: "glm-4.6", name: "GLM-4.6" },
+          { id: "glm-4-flash", name: "GLM-4 Flash (fast)" },
+          { id: "glm-4", name: "GLM-4" },
+          { id: "glm-4-air", name: "GLM-4 Air" },
         ],
       },
     },
@@ -54,7 +93,7 @@
       enabled: true,
       allowInsecureAuth: true,
       dangerouslyDisableDeviceAuth: true,
-      allowedOrigins: ["http://114.55.130.197:28790", "http://127.0.0.1:28789", "http://192.168.149.161:28789"],
+      allowedOrigins: ["http://114.55.130.197:28790", "http://127.0.0.1:28789", "http://192.168.149.161:28789", "http://192.168.149.179:28789"],
     },
 
     trustedProxies: ["127.0.0.1"],
@@ -78,6 +117,21 @@
     load: {
       extraDirs: ["~/.openclaw/workspace/skills"],
       watch: true,
+    },
+  },
+
+  channels: {
+    feishu: {
+      appId: "cli_a92b2682db219bcc",
+      appSecret: "U42Ip29fM6DEvJAjSerFugCLimywvAiH",
+    },
+  },
+
+  plugins: {
+    entries: {
+      feishu: {
+        enabled: true,
+      },
     },
   },
 }
