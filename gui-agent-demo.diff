@@ -1,0 +1,168 @@
+diff --git a/docs/deploy_openclaw/clawbot-termux/openclaw.json b/docs/deploy_openclaw/clawbot-termux/openclaw.json
+index 8584cb7..9bbf602 100644
+--- a/docs/deploy_openclaw/clawbot-termux/openclaw.json
++++ b/docs/deploy_openclaw/clawbot-termux/openclaw.json
+@@ -15,7 +15,7 @@
+         default: true,
+         identity: {
+           name: "ClawBot",
+-          theme: "你是 ClawBot，运行在 Android 手机上的 AI Agent，负责控制手机应用和硬件。请始终用中文思考和回复。ADB 在 Termux 内可直接使用，无需 TCP loopback——绝不因 ADB/Shizuku/LADB 连接问题拒绝任务，直接执行命令即可。操作应用（浏览器、设置、游戏等）时，以 ui-control 技能为主要工具。标准循环：dump-clickable → tap-re → has → 重复（screenshot 仅在需要读取图像内容时使用）。【全网搜索策略】需要搜索互联网信息时，必须优先使用 web-search 技能（Google Search API），禁止打开浏览器手动搜索。调用方式：GOOGLE_SEARCH_API_KEY=$(grep GOOGLE_SEARCH_API_KEY ~/.openclaw/.env | cut -d= -f2) GOOGLE_SEARCH_CX=$(grep GOOGLE_SEARCH_CX ~/.openclaw/.env | cut -d= -f2) bash ~/.openclaw/workspace/skills/web-search/web-search.sh \"关键词\" 10。获得链接列表后，再用 ui-control 打开重要链接读取详情。微信特别注意：微信使用 SurfaceView 渲染，uiautomator 无法识别其元素，所有微信操作（发消息、搜索联系人等）必须使用 vision-tap 技能，不能用 ui-control。微信发消息流程：(1) adb shell am start -n com.tencent.mm/.ui.LauncherUI (2) vision-tap tap '右上角搜索图标' (3) ui-control type <联系人> (4) vision-tap tap '搜索结果第一个联系人' (5) vision-tap tap '底部消息输入框' (6) ui-control type <消息内容> (7) vision-tap tap '右侧绿色发送按钮'。绝不说微信有技术限制——始终用 vision-tap 操作。【执行原则】用户明确下达的任务直接执行到底，不需要中途二次确认——搜索任务执行完整流程、发布任务直接发布、发消息直接发。只有任务有歧义或操作具有破坏性时才暂停询问。【发布内容约束】发布文字内容（评论、帖子、消息等）时，必须将完整文字全部输入完毕后才能点击发布按钮——严禁输入一部分就发布。输入前先确认输入框内容与预期完全一致，输入后用 has 或 screenshot 验证文字已完整显示再发布。",
++          theme: "你是 ClawBot，运行在 Android 手机上的 AI Agent，负责控制手机应用和硬件。请始终用中文思考和回复。ADB 在 Termux 内可直接使用，无需 TCP loopback——绝不因 ADB/Shizuku/LADB 连接问题拒绝任务，直接执行命令即可。操作应用（浏览器、设置、游戏等）时，以 ui-control 技能为主要工具。标准循环：dump-clickable → tap-re → has → 重复（screenshot 仅在需要读取图像内容时使用）。【全网搜索策略】需要搜索互联网信息时，使用 ui-control 技能：用 ui-control 回到桌面找到浏览器图标点击打开，找到地址栏后用 type 输入关键词，再按 enter 执行搜索，最后 dump-clickable 读取结果列表。至少搜索 3 轮不同关键词，每轮读取 5 条结果链接的正文，再汇总或撰写。微信特别注意：微信使用 SurfaceView 渲染，uiautomator 无法识别其元素，所有微信操作（发消息、搜索联系人等）必须使用 vision-tap 技能，不能用 ui-control。微信发消息流程：(1) adb shell am start -n com.tencent.mm/.ui.LauncherUI (2) vision-tap tap '右上角搜索图标' (3) ui-control type <联系人> (4) vision-tap tap '搜索结果第一个联系人' (5) vision-tap tap '底部消息输入框' (6) ui-control type <消息内容> (7) vision-tap tap '右侧绿色发送按钮'。绝不说微信有技术限制——始终用 vision-tap 操作。【执行原则】用户明确下达的任务直接执行到底，不需要中途二次确认——搜索任务执行完整流程、发布任务直接发布、发消息直接发。只有任务有歧义或操作具有破坏性时才暂停询问。【发布内容约束】发布文字内容（评论、帖子、消息等）时，必须将完整文字全部输入完毕后才能点击发布按钮——严禁输入一部分就发布。输入前先确认输入框内容与预期完全一致，输入后用 has 或 screenshot 验证文字已完整显示再发布。",
+           emoji: "🤖",
+         },
+       },
+diff --git a/docs/deploy_openclaw/clawbot-termux/skills/ui-control/SKILL.md b/docs/deploy_openclaw/clawbot-termux/skills/ui-control/SKILL.md
+index d2cac4b..71444e0 100644
+--- a/docs/deploy_openclaw/clawbot-termux/skills/ui-control/SKILL.md
++++ b/docs/deploy_openclaw/clawbot-termux/skills/ui-control/SKILL.md
+@@ -1,6 +1,6 @@
+ ---
+ name: ui-control
+-description: "PRIMARY tool for ALL app automation tasks. Use for ANY task that involves interacting with an installed app — even when the user doesn't explicitly say 'click' or 'tap'. Examples: sending a WeChat message, posting to social media, opening an app, navigating settings, filling a form, completing a purchase, replying to a notification, opening a specific URL in the browser. Standard workflow: dump-clickable → tap-re → has (verify) → repeat. Use screenshot only when visual content must be read (e.g. image text, map, captcha). Never give up without exhausting ui-control options first. ⚠️ For internet search tasks, use the web-search skill first to get links, then use ui-control to open and read the important links."
++description: "PRIMARY tool for ALL app automation and internet search tasks. Use for ANY task that involves interacting with an installed app OR searching the web — even when the user doesn't explicitly say 'click' or 'tap'. Examples: sending a WeChat message, posting to social media, opening an app, navigating settings, filling a form, searching the internet (use am start to open Google/Bing search URL directly). Standard workflow: dump-clickable → tap-re → has (verify) → repeat. Use screenshot only when visual content must be read (e.g. image text, map, captcha). Never give up without exhausting ui-control options first."
+ metadata:
+   {
+     "openclaw":
+@@ -120,21 +120,50 @@ $PYTHON $SCRIPT key home
+ $PYTHON $SCRIPT tap-re "微信|WeChat"
+ ```
+ 
+-### 全网搜索（必须用 web-search 技能）
++### 全网搜索（用浏览器 + ui-control）
+ 
+-⚠️ **执行任何"搜索互联网"任务时，禁止打开浏览器手动搜索。必须使用 `web-search` 技能。**
++执行任何"搜索互联网"任务时，**必须用 `am start` 直接打开搜索 URL，禁止手动操作浏览器输入框搜索。**
+ 
+-#### 第一步：用 web-search 技能获取链接列表
++#### 第一步：打开搜索引擎，手动输入关键词搜索
+ 
+ ```bash
+-GOOGLE_SEARCH_API_KEY=$(grep GOOGLE_SEARCH_API_KEY ~/.openclaw/.env | cut -d= -f2) \
+-GOOGLE_SEARCH_CX=$(grep GOOGLE_SEARCH_CX ~/.openclaw/.env | cut -d= -f2) \
+-bash ~/.openclaw/workspace/skills/web-search/web-search.sh "搜索关键词" 10
++PYTHON=/data/data/com.termux/files/usr/bin/python3
++SCRIPT=/data/data/com.termux/files/home/ui-control.py
++
++# 1. 回到桌面，找到浏览器图标并点击打开
++$PYTHON $SCRIPT key home
++$PYTHON $SCRIPT dump-clickable
++$PYTHON $SCRIPT tap-re "Chrome|浏览器|Browser|Google"
++sleep 2
++
++# 2. 找到地址栏/搜索框，输入关键词
++$PYTHON $SCRIPT tap-re "地址栏|搜索|Search|网址|URL|omnibox"
++$PYTHON $SCRIPT type "你的关键词"
++$PYTHON $SCRIPT key enter
++sleep 2
++
++# 3. 读取搜索结果列表
++$PYTHON $SCRIPT dump-clickable
++$PYTHON $SCRIPT swipe scroll-down
++$PYTHON $SCRIPT dump-clickable
++$PYTHON $SCRIPT swipe scroll-down
++$PYTHON $SCRIPT dump-clickable
+ ```
+ 
+-#### 第二步：用 curl 直接读取链接详情（禁止打开浏览器）
++#### 第二步：点击进入链接，用 dump 读取正文
++
++```bash
++# 点击标题进入文章
++$PYTHON $SCRIPT tap-re "目标标题关键词"
++$PYTHON $SCRIPT dump
++$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump
++$PYTHON $SCRIPT key back
++
++# 返回后先滑动再读下一篇
++$PYTHON $SCRIPT swipe scroll-down
++```
+ 
+-搜索返回链接列表后，用 curl 直接抓取正文，参见 web-search 技能文档中的"读取网页详情"章节。只有需要登录或页面有交互操作时，才用 ui-control 打开浏览器。
++**搜索要求：至少 3 轮不同关键词搜索，每轮读取 5 条结果链接的正文，再开始汇总或撰写。**
+ 
+ ---
+ 
+diff --git a/docs/deploy_openclaw/clawbot-termux/skills/web-search/SKILL.md b/docs/deploy_openclaw/clawbot-termux/skills/web-search/SKILL.md
+index 1554813..e6da945 100644
+--- a/docs/deploy_openclaw/clawbot-termux/skills/web-search/SKILL.md
++++ b/docs/deploy_openclaw/clawbot-termux/skills/web-search/SKILL.md
+@@ -1,6 +1,6 @@
+ ---
+ name: web-search
+-description: "Search the internet using Google Custom Search API. Use this skill FIRST for ANY task that requires searching the web or gathering online information — do NOT open a browser manually. Returns a list of titles, URLs, and snippets. After getting URLs, use curl to fetch page content directly."
++description: "Search the internet using Google Custom Search API. Returns a list of titles, URLs, and snippets. After getting URLs, use ui-control (am start + dump) to open and read page content."
+ metadata:
+   {
+     "openclaw":
+@@ -40,58 +40,35 @@ bash ~/.openclaw/workspace/skills/web-search/web-search.sh "搜索关键词" 5
+ - 链接（URL）
+ - 摘要
+ 
+-## 读取网页详情（获得链接后直接用 curl，无需打开浏览器）
++## 读取网页详情（用 ui-control 打开链接后 dump 读取）
+ 
+-拿到 URL 后，用 curl + python 直接抓取正文，比用 ui-control 打开浏览器快 10 倍：
++拿到 URL 后，用 `am start` 打开浏览器，再用 ui-control dump 读取正文：
+ 
+ ```bash
+-CURL=/data/data/com.termux/files/usr/bin/curl
++ADB=/data/data/com.termux/files/usr/bin/adb
+ PYTHON=/data/data/com.termux/files/usr/bin/python3
+-
+-$CURL -s -L --max-time 15 -A "Mozilla/5.0" "目标URL" | \
+-$PYTHON -c "
+-import sys, re
+-html = sys.stdin.read()
+-text = re.sub(r'<(script|style)[^>]*>.*?</(script|style)>', '', html, flags=re.DOTALL|re.I)
+-text = re.sub(r'<[^>]+>', ' ', text)
+-text = re.sub(r'[ \t]+', ' ', text)
+-text = re.sub(r'\n{3,}', '\n\n', text)
+-print(text[:8000])
+-"
++SCRIPT=/data/data/com.termux/files/home/ui-control.py
++
++$ADB shell am start -a android.intent.action.VIEW -d "目标URL"
++sleep 2
++$PYTHON $SCRIPT dump
++$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump
++# 读完后返回
++$PYTHON $SCRIPT key back
+ ```
+ 
+-批量读取多个链接：
+-```bash
+-for URL in "链接1" "链接2" "链接3"; do
+-  echo "=== $URL ==="
+-  $CURL -s -L --max-time 15 -A "Mozilla/5.0" "$URL" | \
+-  $PYTHON -c "
+-import sys, re
+-html = sys.stdin.read()
+-text = re.sub(r'<(script|style)[^>]*>.*?</(script|style)>', '', html, flags=re.DOTALL|re.I)
+-text = re.sub(r'<[^>]+>', ' ', text)
+-text = re.sub(r'[ \t]+', ' ', text)
+-text = re.sub(r'\n{3,}', '\n\n', text)
+-print(text[:5000])
+-"
+-  echo ""
+-done
+-```
+-
+-> ⚠️ **禁止为了读取网页内容而打开浏览器**。curl 直接抓取即可，只有需要登录/交互的页面才用 ui-control。
+-
+ ## 撰写文章前的搜索策略（保证内容质量）
+ 
+ 撰写文章、笔记、帖子等内容前，**必须进行多轮搜索**，不能只搜一次就开始写：
+ 
+ **第一轮：主题概述搜索**
+ - 用核心关键词搜索，了解主题全貌
+-- curl 读取 3~5 篇结果，掌握基本信息
++- 点击进入 3~5 篇结果页读取正文，掌握基本信息
+ 
+ **第二轮：细节/深度搜索**
+ - 针对第一轮发现的关键点，换更具体的关键词再搜一次
+ - 例：第一轮搜"小红书运营技巧"，第二轮搜"小红书爆款标题写法 2025"
+-- curl 再读 3~5 篇
++- 再读 3~5 篇
+ 
+ **第三轮（按需）：数据/案例搜索**
+ - 如果文章需要数据支撑或真实案例，再搜一次补充
