@@ -92,7 +92,9 @@ $PYTHON $SCRIPT has "目标关键词"
 **规则：**
 - `dump-clickable` 后，先识别页面上所有输入框（标题、正文、话题等）
 - **有标题框则必须先填标题**，不能直接跳到正文输入
-- 发布前用 `dump-clickable` 再扫一遍，确认标题和正文均非空
+- **检测到正文/详情/内容输入框时，必须将完整正文全部输入完毕**，不能只输入摘要或部分内容，不能留空
+- 正文内容较长时，分段多次 `type` 输入，每次输入后用 `has` 或 `dump` 确认文字已追加到输入框，再继续输入下一段
+- 发布前用 `dump-clickable` 再扫一遍，确认标题和正文均非空且内容完整
 - 如果发布失败且提示"请输入标题"/"必填项为空"，立即返回补填，不要重复点击发布
 
 ### 打开 App 的方式
@@ -128,20 +130,9 @@ GOOGLE_SEARCH_CX=$(grep GOOGLE_SEARCH_CX ~/.openclaw/.env | cut -d= -f2) \
 bash ~/.openclaw/workspace/skills/web-search/web-search.sh "搜索关键词" 10
 ```
 
-#### 第二步：用 ui-control 打开重要链接读取详情
+#### 第二步：用 curl 直接读取链接详情（禁止打开浏览器）
 
-搜索返回链接列表后，对重要链接用 `am start` 打开浏览器读取详情：
-
-```bash
-ADB=/data/data/com.termux/files/usr/bin/adb
-PYTHON=/data/data/com.termux/files/usr/bin/python3
-SCRIPT=/data/data/com.termux/files/home/ui-control.py
-
-$ADB shell am start -a android.intent.action.VIEW -d "目标URL"
-sleep 2
-$PYTHON $SCRIPT dump                                        # 读取页面正文
-$PYTHON $SCRIPT swipe scroll-down && $PYTHON $SCRIPT dump  # 继续读下半部分
-```
+搜索返回链接列表后，用 curl 直接抓取正文，参见 web-search 技能文档中的"读取网页详情"章节。只有需要登录或页面有交互操作时，才用 ui-control 打开浏览器。
 
 ---
 
